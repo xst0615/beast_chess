@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Q萌西瓜棋 - 趣味对战</title>
+    <style>
+        :root {
+            --bg-color: #E8F5E9;
+            --board-color: #2E7D32;
+            --line-color: #1B5E20;
+            --text-color: #333;
+            --red-melon: #FF5252;
+            --yellow-melon: #FFCA28;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex; flex-direction: column; align-items: center;
+            user-select: none; touch-action: manipulation;
+        }
+
+        h1 { color: var(--text-color); margin: 15px 0 5px 0; font-size: 26px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+
+        .status-bar {
+            display: flex; flex-direction: column; gap: 10px;
+            width: 380px; margin-bottom: 10px; padding: 10px 15px;
+            background: white; border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08); box-sizing: border-box;
+        }
+
+        .top-controls { display: flex; justify-content: space-between; align-items: center; }
+
+        .turn-indicator {
+            font-size: 16px; font-weight: bold; padding: 6px 14px; border-radius: 20px; transition: 0.3s;
+        }
+        .turn-p1 { background: var(--red-melon); color: white; }
+        .turn-p2 { background: var(--yellow-melon); color: #666; }
+
+        .difficulty-select {
+            padding: 6px; border-radius: 8px; border: 2px solid #ddd;
+            font-weight: bold; outline: none; cursor: pointer; background: #fafafa;
+        }
+
+        .btn-group button {
+            background: #fff; border: 2px solid #ddd; padding: 6px 12px;
+            border-radius: 8px; font-size: 14px; font-weight: bold;
+            cursor: pointer; margin-left: 5px; transition: 0.2s;
+        }
+        .btn-group button:hover:not(:disabled) { background: #f0f0f0; border-color: #ccc; }
+        .btn-group button:active:not(:disabled) { transform: scale(0.95); }
+        .btn-group button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .game-area {
+            position: relative; width: 400px; height: 400px;
+            background: #A5D6A7; border-radius: 50%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2), inset 0 0 20px rgba(0,0,0,0.1);
+            margin-top: 10px;
+        }
+
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        .pieces-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+
+        .piece {
+            position: absolute; width: 36px; height: 36px;
+            margin-left: -18px; margin-top: -18px;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-size: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            cursor: pointer; pointer-events: auto; transition: transform 0.2s, top 0.3s, left 0.3s;
+            background: white; border: 3px solid #333;
+        }
+        .piece:hover { transform: scale(1.15); }
+        .piece.p1 { border-color: var(--red-melon); background: #FFEBEE; }
+        .piece.p2 { border-color: var(--yellow-melon); background: #FFF8E1; }
+        .piece.selected {
+            transform: scale(1.2); box-shadow: 0 0 12px 4px rgba(255, 235, 59, 0.9);
+            animation: bounce 1s infinite alternate; border-color: #FFC107;
+        }
+
+        .valid-move {
+            position: absolute; width: 20px; height: 20px;
+            margin-left: -10px; margin-top: -10px; border-radius: 50%;
+            background: rgba(255, 235, 59, 0.8); box-shadow: 0 0 10px rgba(255, 235, 59, 0.8);
+            cursor: pointer; pointer-events: auto; z-index: 4;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes bounce { from { transform: scale(1.2) translateY(0); } to { transform: scale(1.2) translateY(-5px); } }
+        @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.8; } 100% { transform: scale(1.2); opacity: 0.4; } }
+
+        .thinking-mask {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.4); z-index: 10; display: none;
+            justify-content: center; align-items: center; font-size: 22px; font-weight: bold; color: #333;
+            border-radius: 50%;
+        }
+
+        /* 胜利弹窗与特效 */
+        #fireworks-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+        .modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content {
+            background: white; padding: 30px 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal-content h2 { margin: 0 0 15px 0; font-size: 30px; }
+        .modal-content p { font-size: 18px; color: #666; margin-bottom: 20px; }
+        .modal-content button {
+            background: var(--board-color); color: white; border: none; padding: 10px 25px;
+            font-size: 18px; border-radius: 8px; cursor: pointer; font-weight: bold;
+        }
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        @media (max-width: 420px) {
+            .status-bar { width: 340px; }
+            .game-area { width: 340px; height: 340px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🍉 Q萌西瓜棋</h1>
+    
+    <div class="status-bar">
+        <div class="top-controls">
+            <div id="turn-indicator" class="turn-indicator turn-p1">红西瓜 (你)</div>
+            <select id="difficulty" class="difficulty-select" onchange="initGame()">
+                <option value="1">🌱 入门 (随机走棋)</option>
+                <option value="2">⚔️ 进阶 (贪心吃子)</option>
+                <option value="3" selected>🔥 高阶 (深度推演)</option>
+            </select>
+        </div>
+        <div class="top-controls btn-group">
+            <div style="font-size:13px; color:#555; font-weight:bold;">
+                红🍉: <span id="p1-count">6</span> | 黄🍈: <span id="p2-count">6</span>
+            </div>
+            <div>
+                <button id="btn-undo" onclick="undo()">⬅️ 悔棋</button>
+                <button onclick="initGame()">🔄 重开</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-area" id="game-area">
+        <canvas id="board-canvas" width="400" height="400"></canvas>
+        <div class="pieces-layer" id="pieces-layer"></div>
+        <div class="thinking-mask" id="thinking-mask">🤖 黄西瓜思考中...</div>
+    </div>
+
+    <!-- 胜利弹窗 -->
+    <div class="modal" id="win-modal">
+        <div class="modal-content">
+            <h2 id="win-title">🎉 胜利!</h2>
+            <p id="win-desc">恭喜获胜！</p>
+            <button onclick="initGame()">再来一局</button>
+        </div>
+    </div>
+    <canvas id="fireworks-canvas"></canvas>
+
+<script>
+    // ---------------- 棋盘图结构生成 (21个节点) ----------------
+    // 节点 0: 中心
+    // 节点 1-8: 内圈 (N, NE, E, SE, S, SW, W, NW)
+    // 节点 9-16: 外圈 (N, NE, E, SE, S, SW, W, NW)
+    // 节点 17-20: 外部半圆顶点 (N, E, S, W)
+    const CX = 200, CY = 200;
+    const R1 = 55, R2 = 125, R3 = 190;
+    const nodes = [{x: CX, y: CY}]; // 0
+    
+    // 生成内圈和外圈坐标
+    for(let r of [R1, R2]) {
+        for(let i=0; i<8; i++) {
+            let a = (i * 45 - 90) * Math.PI / 180;
+            nodes.push({x: CX + r * Math.cos(a), y: CY + r * Math.sin(a)});
+        }
+    }
+    // 生成4个外顶点
+    [0, 2, 4, 6].forEach(i => {
+        let a = (i * 45 - 90) * Math.PI / 180;
+        nodes.push({x: CX + R3 * Math.cos(a), y: CY + R3 * Math.sin(a)});
+    });
+
+    // 定义图的连通边 (邻接表)
+    const edges = [
+        [1,2,3,4,5,6,7,8], // 0 中心
+        [0,8,2,9],   // 1 N内
+        [0,1,3,10],  // 2 NE内
+        [0,2,4,11],  // 3 E内
+        [0,3,5,12],  // 4 SE内
+        [0,4,6,13],  // 5 S内
+        [0,5,7,14],  // 6 SW内
+        [0,6,8,15],  // 7 W内
+        [0,7,1,16],  // 8 NW内
+        [1,16,10,17], // 9 N外
+        [2,9,11,17,18], // 10 NE外 (连接N顶点和E顶点)
+        [3,10,12,18], // 11 E外
+        [4,11,13,18,19], // 12 SE外
+        [5,12,14,19], // 13 S外
+        [6,13,15,19,20], // 14 SW外
+        [7,14,16,20], // 15 W外
+        [8,15,9,20,17], // 16 NW外
+        [9,16,10], // 17 N顶点
+        [11,10,12], // 18 E顶点
+        [13,12,14], // 19 S顶点
+        [15,14,16]  // 20 W顶点
+    ];
+
+    // ---------------- 游戏状态与常量 ----------------
+    const P1 = 1;  // 玩家 (红🍉)
+    const P2 = -1; // AI (黄🍈)
+    
+    let board = new Int8Array(21); // 0=空, 1=P1, -1=P2
+    let currentPlayer = P1;
+    let selectedNode = null;
+    let validMoves = [];
+    let history = [];
+    let isGameOver = false;
+    let isAITurn = false;
+
+    // 初始化阵型 (完美对称)
+    const INIT_P1 = [17, 16, 9, 10, 8, 2]; // 顶部
+    const INIT_P2 = [19, 14, 13, 12, 6, 4]; // 底部
+
+    // ---------------- 初始化与渲染 ----------------
+    function drawBoard() {
+        const canvas = document.getElementById('board-canvas');
+        const ctx = canvas.getContext('2d');
+        let scale = canvas.width / 400; // 适配小屏幕
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.scale(scale, scale);
+
+        // 绘制西瓜皮底纹效果
+        ctx.beginPath();
+        ctx.arc(CX, CY, 195, 0, Math.PI*2);
+        ctx.fillStyle = '#C8E6C9'; ctx.fill();
+        ctx.lineWidth = 4; ctx.strokeStyle = 'var(--line-color)'; ctx.stroke();
+
+        // 绘制所有连线
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'var(--line-color)';
+        for(let i=0; i<nodes.length; i++) {
+            for(let j of edges[i]) {
+                if(i < j) { // 避免重复绘制
+                    ctx.beginPath();
+                    // 处理半圆的弧线美化
+                    if(i >= 17 && (j >= 9 && j <= 16)) {
+                        ctx.moveTo(nodes[i].x, nodes[i].y);
+                        // 用二次贝塞尔曲线画出半圆感
+                        let midX = (nodes[i].x + nodes[j].x)/2;
+                        let midY = (nodes[i].y + nodes[j].y)/2;
+                        let offset = 20; // 弧度偏移
+                        if(i===17) midY -= offset;
+                        if(i===18) midX += offset;
+                        if(i===19) midY += offset;
+                        if(i===20) midX -= offset;
+                        ctx.quadraticCurveTo(midX, midY, nodes[j].x, nodes[j].y);
+                    } else {
+                        ctx.moveTo(nodes[i].x, nodes[i].y);
+                        ctx.lineTo(nodes[j].x, nodes[j].y);
+                    }
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // 绘制交叉点提示圆
+        for(let i=0; i<nodes.length; i++) {
+            ctx.beginPath();
+            ctx.arc(nodes[i].x, nodes[i].y, 5, 0, Math.PI*2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.lineWidth = 2; ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    function initGame() {
+        document.getElementById('win-modal').style.display = 'none';
+        stopFireworks();
+        
+        board.fill(0);
+        INIT_P1.forEach(pos => board[pos] = P1);
+        INIT_P2.forEach(pos => board[pos] = P2);
+        
+        currentPlayer = P1;
+        selectedNode = null;
+        validMoves = [];
+        history = [];
+        isGameOver = false;
+        isAITurn = false;
+        
+        // 适配容器缩放
+        const container = document.getElementById('game-area');
+        const canvas = document.getElementById('board-canvas');
+        if(container.offsetWidth < 400) {
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+        }
+
+        drawBoard();
+        updateUI();
+        renderPieces();
+    }
+
+    function updateUI() {
+        let p1c = 0, p2c = 0;
+        board.forEach(v => { if(v===P1) p1c++; if(v===P2) p2c++; });
+        document.getElementById('p1-count').innerText = p1c;
+        document.getElementById('p2-count').innerText = p2c;
+        
+        const indicator = document.getElementById('turn-indicator');
+        document.getElementById('btn-undo').disabled = isAITurn || history.length === 0;
+
+        if (currentPlayer === P1) {
+            indicator.textContent = '🍉 红西瓜 (你) 回合';
+            indicator.className = 'turn-indicator turn-p1';
+        } else {
+            indicator.textContent = '🍈 黄西瓜 (AI) 思考中';
+            indicator.className = 'turn-indicator turn-p2';
+        }
+    }
+
+    function renderPieces() {
+        const layer = document.getElementById('pieces-layer');
+        layer.innerHTML = '';
+        
+        let scale = document.getElementById('game-area').offsetWidth / 400;
+
+        // 渲染走棋提示点
+        validMoves.forEach(target => {
+            let dot = document.createElement('div');
+            dot.className = 'valid-move';
+            dot.style.left = (nodes[target].x * scale) + 'px';
+            dot.style.top = (nodes[target].y * scale) + 'px';
+            dot.onclick = () => executeMove(selectedNode, target);
+            layer.appendChild(dot);
+        });
+
+        // 渲染棋子
+        for(let i=0; i<21; i++) {
+            if(board[i] !== 0) {
+                let piece = document.createElement('div');
+                piece.className = `piece ${board[i] === P1 ? 'p1' : 'p2'}`;
+                if(selectedNode === i) piece.classList.add('selected');
+                
+                piece.innerText = board[i] === P1 ? '🍉' : '🍈';
+                piece.style.left = (nodes[i].x * scale) + 'px';
+                piece.style.top = (nodes[i].y * scale) + 'px';
+                
+                piece.onclick = () => handlePieceClick(i);
+                layer.appendChild(piece);
+            }
+        }
+    }
+
+    // ---------------- 游戏交互逻辑 ----------------
+    function handlePieceClick(nodeIdx) {
+        if (isGameOver || isAITurn || currentPlayer !== P1) return;
+
+        if (board[nodeIdx] === currentPlayer) {
+            selectedNode = nodeIdx;
+            // 查找合法移动目标 (相邻且为空)
+            validMoves = edges[nodeIdx].filter(adj => board[adj] === 0 && !isSuicide(board, nodeIdx, adj, currentPlayer));
+            renderPieces();
+        }
+    }
+
+    function executeMove(from, to) {
+        // 记录历史
+        history.push({ board: new Int8Array(board), turn: currentPlayer });
+
+        // 执行移动
+        board[to] = currentPlayer;
+        board[from] = 0;
+        selectedNode = null;
+        validMoves = [];
+
+        // 判定吃子
+        let captured = checkCaptures(board, -currentPlayer);
+        captured.forEach(n => board[n] = 0);
+
+        renderPieces();
+        
+        if(!checkWinCondition()) {
+            currentPlayer *= -1;
+            updateUI();
+            
+            if(currentPlayer === P2) {
+                isAITurn = true;
+                document.getElementById('thinking-mask').style.display = 'flex';
+                setTimeout(makeAIMove, 50); // 留出UI渲染时间
+            } else {
+                isAITurn = false;
+                document.getElementById('thinking-mask').style.display = 'none';
+            }
+        }
+    }
+
+    function undo() {
+        if(history.length < 2 || isGameOver || isAITurn) return;
+        history.pop(); // 弹出玩家
+        let prev = history.pop(); // 弹出AI，恢复到玩家回合前
+        board = new Int8Array(prev.board);
+        currentPlayer = prev.turn;
+        selectedNode = null; validMoves = [];
+        updateUI(); renderPieces();
+    }
+
+    // ---------------- 核心规则算法 (围棋式吃子) ----------------
+    
+    // 获取同色连通块
+    function getGroup(b, startNode, color) {
+        let group = [];
+        let visited = new Set();
+        let queue = [startNode];
+        visited.add(startNode);
+        
+        while(queue.length > 0) {
+            let curr = queue.shift();
+            group.push(curr);
+            for(let adj of edges[curr]) {
+                if(b[adj] === color && !visited.has(adj)) {
+                    visited.add(adj);
+                    queue.push(adj);
+                }
+            }
+        }
+        return group;
+    }
+
+    // 计算连通块的气(相邻空点数)
+    function countLiberties(b, group) {
+        let liberties = 0;
+        let visited = new Set();
+        for(let node of group) {
+            for(let adj of edges[node]) {
+                if(b[adj] === 0 && !visited.has(adj)) {
+                    liberties++;
+                    visited.add(adj);
+                }
+            }
+        }
+        return liberties;
+    }
+
+    // 检查并返回被吃掉的节点列表
+    function checkCaptures(b, victimColor) {
+        let captured = [];
+        let globalVisited = new Set();
+        
+        for(let i=0; i<21; i++) {
+            if(b[i] === victimColor && !globalVisited.has(i)) {
+                let group = getGroup(b, i, victimColor);
+                group.forEach(n => globalVisited.add(n));
+                if(countLiberties(b, group) === 0) {
+                    captured.push(...group);
+                }
+            }
+        }
+        return captured;
+    }
+
+    // 检查是否为自杀步(不允许移动后自己没气，除非能反杀对方)
+    function isSuicide(b, from, to, color) {
+        let tempB = new Int8Array(b);
+        tempB[to] = color; tempB[from] = 0;
+        
+        // 看看能不能吃掉对方，能吃就不算自杀
+        if(checkCaptures(tempB, -color).length > 0) return false;
+        
+        // 不能吃对方，检查自己是否没气
+        let myGroup = getGroup(tempB, to, color);
+        return countLiberties(tempB, myGroup) === 0;
+    }
+
+    function checkWinCondition() {
+        let p1c = 0, p2c = 0;
+        let p1HasMoves = false, p2HasMoves = false;
+        
+        for(let i=0; i<21; i++) {
+            if(board[i] === P1) {
+                p1c++;
+                if(!p1HasMoves && edges[i].some(a => board[a]===0 && !isSuicide(board, i, a, P1))) p1HasMoves = true;
+            }
+            if(board[i] === P2) {
+                p2c++;
+                if(!p2HasMoves && edges[i].some(a => board[a]===0 && !isSuicide(board, i, a, P2))) p2HasMoves = true;
+            }
+        }
+        
+        updateUI(); // 更新计数
+
+        if (p2c <= 2 || (!p2HasMoves && currentPlayer === P2)) {
+            triggerWin(P1, p2c <= 2 ? "对方兵力不足，你赢了！" : "瓮中捉鳖！对方已被憋死！"); return true;
+        }
+        if (p1c <= 2 || (!p1HasMoves && currentPlayer === P1)) {
+            triggerWin(P2, p1c <= 2 ? "我方兵力不足，遗憾落败。" : "无路可走，你被憋死了！"); return true;
+        }
+        return false;
+    }
+
+    function triggerWin(winner, desc) {
+        isGameOver = true; isAITurn = false;
+        document.getElementById('thinking-mask').style.display = 'none';
+        
+        const title = document.getElementById('win-title');
+        if (winner === P1) {
+            title.innerHTML = '🎉 红西瓜 (你) 获胜!';
+            title.style.color = 'var(--red-melon)';
+            startFireworks();
+        } else {
+            title.innerHTML = '💀 黄西瓜 (AI) 获胜!';
+            title.style.color = '#666';
+        }
+        document.getElementById('win-desc').innerText = desc;
+        document.getElementById('win-modal').style.display = 'flex';
+    }
+
+    // ---------------- AI 核心算法 ----------------
+    function makeAIMove() {
+        if(isGameOver) return;
+        let diff = parseInt(document.getElementById('difficulty').value);
+        let bestMove = null;
+
+        // 获取所有合法步
+        let allMoves = [];
+        for(let i=0; i<21; i++) {
+            if(board[i] === P2) {
+                edges[i].forEach(adj => {
+                    if(board[adj] === 0 && !isSuicide(board, i, adj, P2)) {
+                        allMoves.push({fr: i, to: adj});
+                    }
+                });
+            }
+        }
+
+        if(allMoves.length === 0) { checkWinCondition(); return; }
+
+        if(diff === 1) { // 入门: 随机
+            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+        } 
+        else if(diff === 2) { // 进阶: 贪心(看一步)
+            let bestScore = -Infinity;
+            for(let m of allMoves) {
+                let score = evalMove(board, m, P2);
+                if(score > bestScore) { bestScore = score; bestMove = m; }
+                else if(score === bestScore && Math.random() > 0.5) { bestMove = m; }
+            }
+        }
+        else { // 高阶: Minimax Alpha-Beta Depth 3
+            let bestScore = -Infinity;
+            bestMove = allMoves[0];
+            for(let m of allMoves) {
+                let simB = new Int8Array(board);
+                simB[m.to] = P2; simB[m.fr] = 0;
+                checkCaptures(simB, P1).forEach(n => simB[n] = 0);
+                
+                let score = minimax(simB, 2, -Infinity, Infinity, false);
+                if(score > bestScore) { bestScore = score; bestMove = m; }
+                else if(score === bestScore && Math.random() > 0.7) { bestMove = m; }
+            }
+        }
+
+        if(bestMove) executeMove(bestMove.fr, bestMove.to);
+    }
+
+    function evalMove(b, move, color) {
+        let simB = new Int8Array(b);
+        simB[move.to] = color; simB[move.fr] = 0;
+        let caps = checkCaptures(simB, -color);
+        caps.forEach(n => simB[n] = 0);
+        return evaluateBoard(simB) * (color === P2 ? 1 : -1) + caps.length * 1000;
+    }
+
+    function minimax(b, depth, alpha, beta, isMaximizing) {
+        let p1c=0, p2c=0;
+        for(let i=0; i<21; i++) { if(b[i]===P1) p1c++; else if(b[i]===P2) p2c++; }
+        if(p1c <= 2) return 99999 + depth; // P2 Win
+        if(p2c <= 2) return -99999 - depth; // P1 Win
+        if(depth === 0) return evaluateBoard(b);
+
+        let color = isMaximizing ? P2 : P1;
+        let moves = [];
+        for(let i=0; i<21; i++) {
+            if(b[i] === color) {
+                edges[i].forEach(adj => {
+                    if(b[adj] === 0 && !isSuicide(b, i, adj, color)) moves.push({fr: i, to: adj});
+                });
+            }
+        }
+        if(moves.length === 0) return isMaximizing ? -99999 : 99999; // 困毙
+
+        if(isMaximizing) {
+            let maxEv = -Infinity;
+            for(let m of moves) {
+                let simB = new Int8Array(b);
+                simB[m.to] = P2; simB[m.fr] = 0;
+                checkCaptures(simB, P1).forEach(n => simB[n] = 0);
+                maxEv = Math.max(maxEv, minimax(simB, depth-1, alpha, beta, false));
+                alpha = Math.max(alpha, maxEv);
+                if(beta <= alpha) break;
+            }
+            return maxEv;
+        } else {
+            let minEv = Infinity;
+            for(let m of moves) {
+                let simB = new Int8Array(b);
+                simB[m.to] = P1; simB[m.fr] = 0;
+                checkCaptures(simB, P2).forEach(n => simB[n] = 0);
+                minEv = Math.min(minEv, minimax(simB, depth-1, alpha, beta, true));
+                beta = Math.min(beta, minEv);
+                if(beta <= alpha) break;
+            }
+            return minEv;
+        }
+    }
+
+    function evaluateBoard(b) {
+        let score = 0;
+        for(let i=0; i<21; i++) {
+            if(b[i] === P2) {
+                score += 1000;
+                // 鼓励靠近中心
+                if(i===0) score += 30;
+                else if(i>=1 && i<=8) score += 10;
+            }
+            else if(b[i] === P1) {
+                score -= 1000;
+                if(i===0) score -= 30;
+                else if(i>=1 && i<=8) score -= 10;
+            }
+        }
+        return score;
+    }
+
+    // ---------------- 烟花特效 ----------------
+    const fwCanvas = document.getElementById('fireworks-canvas');
+    const fwCtx = fwCanvas.getContext('2d');
+    let particles = [], fwAnimId = null;
+
+    window.addEventListener('resize', () => { fwCanvas.width = window.innerWidth; fwCanvas.height = window.innerHeight; });
+    fwCanvas.width = window.innerWidth; fwCanvas.height = window.innerHeight;
+
+    function createFirework(x, y) {
+        const colors = ['#FF5252', '#FFCA28', '#4CAF50', '#03A9F4', '#E040FB'];
+        for (let i = 0; i < 40; i++) {
+            const angle = Math.random() * Math.PI * 2, speed = Math.random() * 5 + 3;
+            particles.push({
+                x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                radius: Math.random() * 3 + 2, color: colors[Math.floor(Math.random() * colors.length)],
+                alpha: 1, decay: Math.random() * 0.02 + 0.015
+            });
+        }
+    }
+
+    function animateFireworks() {
+        if (!isGameOver) return;
+        fwCtx.fillStyle = 'rgba(0, 0, 0, 0.15)'; fwCtx.fillRect(0, 0, fwCanvas.width, fwCanvas.height);
+        if (Math.random() < 0.08) createFirework(Math.random() * fwCanvas.width, Math.random() * fwCanvas.height * 0.5);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.alpha -= p.decay; // 坠落重力
+            if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+            fwCtx.beginPath(); fwCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            fwCtx.fillStyle = p.color; fwCtx.globalAlpha = p.alpha; fwCtx.fill();
+        }
+        fwCtx.globalAlpha = 1;
+        fwAnimId = requestAnimationFrame(animateFireworks);
+    }
+
+    function startFireworks() { fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height); particles = []; animateFireworks(); }
+    function stopFireworks() { if(fwAnimId) cancelAnimationFrame(fwAnimId); fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height); }
+
+    // 启动游戏
+    window.onload = initGame;
+</script>
+</body>
+</html>
