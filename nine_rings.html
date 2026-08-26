@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>九连环</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #fff8e1 0%, #ffe0b2 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 15px;
+    }
+    h1 { color: #e65100; font-size: 28px; margin-bottom: 12px; letter-spacing: 3px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+    .main-layout { display: flex; gap: 20px; align-items: flex-start; max-width: 840px; width: 100%; flex-wrap: nowrap; justify-content: center; }
+    .game-section { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
+    .status-bar {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+        background: #fff; padding: 8px 12px; border-radius: 12px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.12); width: 460px; max-width: 100%; font-size: 14px;
+    }
+    .move-info { font-weight: bold; color: #e65100; }
+    .move-info .divider { color: #ccc; margin: 0 4px; }
+    .status-bar button {
+        padding: 6px 10px; border: none; border-radius: 8px; background: #ff7043; color: #fff;
+        font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s, transform 0.1s;
+    }
+    .status-bar button:hover { background: #e64a19; transform: translateY(-1px); }
+    .diff-select { padding: 6px; border-radius: 8px; border: 2px solid #ddd; font-weight: bold; outline: none; cursor: pointer; background: #fafafa; font-size: 13px; }
+    .board-wrap {
+        position: relative; width: 460px; height: 460px; max-width: 100%;
+        background: #fffde7; border-radius: 16px; border: 4px solid #ffcc80;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.15); overflow: hidden;
+    }
+    #board-canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+    .hint-tip {
+        position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+        background: rgba(230,81,0,0.92); color: #fff; padding: 6px 14px; border-radius: 20px;
+        font-size: 13px; font-weight: bold; white-space: nowrap; opacity: 0;
+        transition: opacity 0.3s; pointer-events: none; z-index: 5;
+    }
+    .hint-tip.show { opacity: 1; }
+    .rules-panel { width: 300px; flex-shrink: 1; min-width: 270px; }
+    .rules-panel details {
+        background: #fff8e1; border: 2px solid #ffe0b2; border-radius: 14px; overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: sticky; top: 15px;
+    }
+    .rules-panel summary {
+        list-style: none; cursor: pointer; padding: 12px 16px;
+        background: linear-gradient(135deg, #e65100, #ff7043); color: #fff;
+        font-weight: bold; font-size: 17px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .rules-panel summary::-webkit-details-marker { display: none; }
+    .rules-panel summary .arrow { transition: transform 0.3s; font-size: 12px; opacity: 0.8; }
+    .rules-panel details[open] summary .arrow { transform: rotate(180deg); }
+    .panel-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rule-item {
+        display: flex; gap: 10px; align-items: flex-start; background: #fff;
+        border: 1px solid #ffe0b2; border-radius: 10px; padding: 9px 10px;
+        font-size: 14px; line-height: 1.5; color: #5d4037; transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .rule-item:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(230,81,0,0.12); }
+    .rule-icon { font-size: 22px; background: #fff3e0; border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rule-item b { color: #e65100; }
+    .color-legend { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; background: #fff; border: 1px solid #ffe0b2; border-radius: 10px; padding: 8px; }
+    .legend-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 11px; text-shadow: 1px 1px 1px rgba(0,0,0,0.3); }
+    .win-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .win-modal.show { display: flex; }
+    .win-card { background: #fff; padding: 30px 40px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: pop 0.4s ease; }
+    @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .win-card h2 { font-size: 28px; color: #e65100; margin-bottom: 10px; }
+    .win-card p { color: #6d4c41; font-size: 16px; margin-bottom: 20px; }
+    .win-card button { padding: 10px 28px; border: none; border-radius: 10px; background: #ff7043; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .win-card button:hover { background: #e64a19; }
+    #fireworks { position: fixed; inset: 0; pointer-events: none; z-index: 99; }
+    @media (max-width: 800px) {
+        .main-layout { flex-wrap: wrap; }
+        .rules-panel { width: 460px; max-width: 100%; }
+        .rules-panel details { position: static; }
+    }
+    @media (max-width: 480px) {
+        .board-wrap { width: 360px; height: 360px; }
+        .status-bar { width: 360px; }
+        .rules-panel { width: 360px; }
+    }
+</style>
+</head>
+<body>
+<h1>🔗 解连环 🔗</h1>
+<div class="main-layout">
+    <div class="game-section">
+        <div class="status-bar">
+            <div class="move-info">👣 <span id="move-count">0</span> 步 <span class="divider">|</span> 已解 <span id="solved-count">0</span>/<span id="total-count">9</span></div>
+            <select id="diff" class="diff-select" onchange="initGame()">
+                <option value="3">🌱 3环</option>
+                <option value="5">⭐ 5环</option>
+                <option value="7">🔥 7环</option>
+                <option value="9" selected>👑 9环</option>
+            </select>
+            <button onclick="showHint()">💡 提示</button>
+            <button onclick="undoMove()">↩ 悔棋</button>
+            <button onclick="initGame()">🔄 重开</button>
+        </div>
+        <div class="board-wrap">
+            <canvas id="board-canvas" width="460" height="460"></canvas>
+            <div class="hint-tip" id="hint-tip"></div>
+        </div>
+    </div>
+    <div class="rules-panel">
+        <details open>
+            <summary><span>📖 解连环怎么玩</span><span class="arrow">▼</span></summary>
+            <div class="panel-body">
+                <div class="rule-item"><span class="rule-icon">🎯</span><div><b>怎么赢：</b>把像花儿一样的彩色环环全部解开！</div></div>
+                <div class="rule-item"><span class="rule-icon">🔓</span><div><b>找卡扣：</b>每个环缺口两端有彩色小滑块，点它打开卡扣！</div></div>
+                <div class="rule-item"><span class="rule-icon">🔢</span><div><b>按顺序：</b>从1号环开始，解完一个才能解下一个哦！</div></div>
+                <div class="rule-item"><span class="rule-icon">✨</span><div><b>发光提示：</b>发黄光的卡扣可以点，点了环就"嘣"地飞出去！</div></div>
+                <div class="rule-item"><span class="rule-icon">💡</span><div><b>卡住了：</b>点「提示」按钮，它会告诉你点哪里~</div></div>
+                <div class="rule-item"><span class="rule-icon">↩</span><div><b>点错了：</b>点「悔棋」可以退回去重新来！</div></div>
+                <div class="color-legend" id="color-legend"></div>
+            </div>
+        </details>
+    </div>
+</div>
+<div class="win-modal" id="win-modal">
+    <div class="win-card">
+        <h2>🎉 全部解开啦！</h2>
+        <p id="win-desc"></p>
+        <button onclick="initGame()">🔄 再玩一次</button>
+    </div>
+</div>
+<canvas id="fireworks"></canvas>
+
+<script>
+const CV = 460;
+const CX = CV / 2, CY = CV / 2;
+
+const RING_COLORS = [
+    { main: '#1e88e5', light: '#64b5f6', dark: '#0d47a1', name: '蓝' },
+    { main: '#43a047', light: '#81c784', dark: '#2e7d32', name: '绿' },
+    { main: '#fb8c00', light: '#ffb74d', dark: '#e65100', name: '橙' },
+    { main: '#e53935', light: '#ef9a9a', dark: '#b71c1c', name: '红' },
+    { main: '#ab47bc', light: '#ce93d8', dark: '#7b1fa2', name: '紫' },
+    { main: '#fdd835', light: '#fff176', dark: '#f9a825', name: '黄' },
+    { main: '#00acc1', light: '#4dd0e1', dark: '#006064', name: '青' },
+    { main: '#ec407a', light: '#f48fb1', dark: '#ad1457', name: '粉' },
+    { main: '#8d6e63', light: '#bcaaa4', dark: '#4e342e', name: '棕' },
+];
+
+const CLIP_COLORS = ['#43a047', '#fb8c00', '#e53935'];
+
+const CFG = {
+    3: { r: 85, t: 20 },
+    5: { r: 70, t: 17 },
+    7: { r: 58, t: 15 },
+    9: { r: 50, t: 14 },
+};
+
+let nRings = 9;
+let rings = [];
+let moveCount = 0;
+let history = [];
+let isGameOver = false;
+let flyAnim = null;
+let clipSlideAnim = null;
+let hintIdx = -1, hintUntil = 0;
+let lockShake = -1, lockShakeTime = 0;
+const GAP_HALF = 0.28;
+
+// ================= 花形互扣布局 =================
+// 核心思路：每个环绕中心呈花瓣状排列，C形缺口朝内，
+// 环之间深度重叠，形成像花一样互相穿织的效果
+function layoutRings() {
+    rings = [];
+    const { r, t } = CFG[nRings];
+
+    for (let i = 0; i < nRings; i++) {
+        const angle = (i / nRings) * Math.PI * 2 - Math.PI / 2;
+        
+        const overlap = nRings <= 3 ? 0.5 : nRings <= 5 ? 0.48 : nRings <= 7 ? 0.45 : 0.42;
+        const dist = r * (1 - overlap);
+        
+        const ringCx = CX + Math.cos(angle) * dist;
+        const ringCy = CY + Math.sin(angle) * dist;
+
+        const gapDir = angle + Math.PI;
+
+        rings.push({
+            id: i,
+            cx: ringCx, cy: ringCy,
+            r: r,
+            t: t,
+            angle,
+            gapDir,
+            colorIdx: i % RING_COLORS.length,
+            clipColor1: CLIP_COLORS[i % CLIP_COLORS.length],
+            clipColor2: CLIP_COLORS[(i + 1) % CLIP_COLORS.length],
+            clipT: 0,
+            removed: false,
+            flyVx: 0, flyVy: 0, flyRot: 0, flyRotSpeed: 0,
+            flyX: 0, flyY: 0, flyScale: 1,
+            _clipHits: [],
+        });
+    }
+}
+
+// ================= 解环规则（适合5岁小朋友：按顺序从外到内解）=================
+// 规则：要解第n环，必须第1到n-1环都已经解开啦！
+function canUnlock(i) {
+    if (rings[i].removed) return false;
+    if (rings[i].clipT > 0) return false;
+    for (let j = 0; j < i; j++) {
+        if (!rings[j].removed) return false;
+    }
+    return true;
+}
+
+function whyNot(i) {
+    if (rings[i].removed) return '';
+    const col = RING_COLORS[rings[i].colorIdx].name;
+    for (let j = 0; j < i; j++) {
+        if (!rings[j].removed) {
+            const jcol = RING_COLORS[rings[j].colorIdx].name;
+            return `🔗 ${i+1}号${col}环被${j+1}号${jcol}环扣住啦，先解外面的！`;
+        }
+    }
+    return '';
+}
+
+function findUnlockable() {
+    for (let j = 0; j < rings.length; j++) {
+        if (!rings[j].removed && rings[j].clipT === 0) {
+            if (canUnlock(j)) return j;
+        }
+    }
+    return -1;
+}
+
+// ================= 绘制工具 =================
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function lighten(hex, amt) {
+    const r = Math.min(255, parseInt(hex.slice(1,3),16)+amt);
+    const g = Math.min(255, parseInt(hex.slice(3,5),16)+amt);
+    const b = Math.min(255, parseInt(hex.slice(5,7),16)+amt);
+    return `rgb(${r},${g},${b})`;
+}
+function darken(hex, amt) {
+    const r = Math.max(0, parseInt(hex.slice(1,3),16)-amt);
+    const g = Math.max(0, parseInt(hex.slice(3,5),16)-amt);
+    const b = Math.max(0, parseInt(hex.slice(5,7),16)-amt);
+    return `rgb(${r},${g},${b})`;
+}
+
+function normalizeAngle(a) {
+    while (a < 0) a += Math.PI * 2;
+    while (a >= Math.PI * 2) a -= Math.PI * 2;
+    return a;
+}
+
+function angleInRange(a, start, end) {
+    a = normalizeAngle(a);
+    start = normalizeAngle(start);
+    end = normalizeAngle(end);
+    if (start <= end) {
+        return a >= start && a <= end;
+    } else {
+        return a >= start || a <= end;
+    }
+}
+
+// 绘制C形管弧段
+function drawTubeArc(ctx, cx, cy, radius, thick, a0, a1, color, alpha) {
+    a0 = normalizeAngle(a0);
+    a1 = normalizeAngle(a1);
+    let sweep;
+    if (a1 >= a0) {
+        sweep = a1 - a0;
+    } else {
+        sweep = (Math.PI * 2 - a0) + a1;
+    }
+    if (sweep <= 0.01) return;
+    
+    const outR = radius + thick/2;
+    const inR = radius - thick/2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(cx, cy, outR, a0, a1, a1 < a0);
+    ctx.arc(cx, cy, inR, a1, a0, !(a1 < a0));
+    ctx.closePath();
+    ctx.shadowColor = 'rgba(0,0,0,0.25)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 3;
+    const lx = cx - outR*0.3, ly = cy - outR*0.3;
+    const grad = ctx.createRadialGradient(lx, ly, inR*0.1, cx, cy, outR*1.2);
+    grad.addColorStop(0, color.light);
+    grad.addColorStop(0.5, color.main);
+    grad.addColorStop(1, color.dark);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, a0+0.06, a1, a1 < a0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = thick*0.28;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawTubeEnd(ctx, cx, cy, radius, thick, angle, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const ex = cx + Math.cos(angle)*radius;
+    const ey = cy + Math.sin(angle)*radius;
+    const perpX = -Math.sin(angle);
+    const perpY = Math.cos(angle);
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, thick/2, thick/2*0.75, angle, 0, Math.PI*2);
+    ctx.fillStyle = color.dark;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ex+perpX*thick*0.15, ey+perpY*thick*0.15, thick*0.15, 0, Math.PI*2);
+    ctx.fillStyle = color.light;
+    ctx.fill();
+    ctx.restore();
+    return {x: ex, y: ey};
+}
+
+function drawOneClip(ctx, bx, by, angle, cw, ch, clipColor, glow, isHint) {
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(angle + Math.PI/2);
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 2;
+    if (glow || isHint) {
+        ctx.shadowColor = isHint ? 'rgba(76,175,80,0.8)' : 'rgba(255,193,7,0.8)';
+        ctx.shadowBlur = isHint ? 18 : 12;
+    }
+    roundRect(ctx, -cw/2, -ch/2, cw, ch, 4);
+    const cg = ctx.createLinearGradient(0, -ch/2, 0, ch/2);
+    cg.addColorStop(0, lighten(clipColor, 55));
+    cg.addColorStop(0.5, clipColor);
+    cg.addColorStop(1, darken(clipColor, 35));
+    ctx.fillStyle = cg;
+    ctx.fill();
+    ctx.strokeStyle = darken(clipColor, 45);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    roundRect(ctx, -cw/2+2, -ch/2+2, cw-4, ch*0.32, 2);
+    ctx.fill();
+    ctx.fillStyle = darken(clipColor, 20);
+    roundRect(ctx, -cw*0.2, -ch*0.06, cw*0.4, ch*0.16, 1.5);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawCenterDot(ctx) {
+    ctx.beginPath();
+    ctx.arc(CX, CY, 7, 0, Math.PI*2);
+    const g = ctx.createRadialGradient(CX-2, CY-2, 1, CX, CY, 7);
+    g.addColorStop(0, '#ffe0b2');
+    g.addColorStop(1, '#e65100');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(CX-1.5, CY-1.5, 2.5, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fill();
+}
+
+function shakeOffset(i, now) {
+    if (lockShake !== i) return null;
+    const t = now - lockShakeTime;
+    if (t > 400) { lockShake = -1; return null; }
+    return { x: Math.sin(t/22)*6, y: 0 };
+}
+
+function clipPositions(rg) {
+    const sAng = rg.gapDir + GAP_HALF;
+    const eAng = rg.gapDir - GAP_HALF;
+    const t = rg.clipT;
+    const slideAng = Math.PI * 0.6 * t;
+    const ang1 = normalizeAngle(sAng + slideAng);
+    const ang2 = normalizeAngle(eAng - slideAng);
+    return {
+        c1: { x: rg.cx + Math.cos(ang1)*rg.r, y: rg.cy + Math.sin(ang1)*rg.r, ang: ang1 },
+        c2: { x: rg.cx + Math.cos(ang2)*rg.r, y: rg.cy + Math.sin(ang2)*rg.r, ang: ang2 },
+        sAng: normalizeAngle(sAng), eAng: normalizeAngle(eAng)
+    };
+}
+
+// 判断环rg在给定角度ang处的弧段是否应该在另一个环other之上
+// 用于实现穿插效果
+function isArcOnTop(rg, ang, other) {
+    const px = rg.cx + Math.cos(ang) * rg.r;
+    const py = rg.cy + Math.sin(ang) * rg.r;
+    const d = Math.hypot(px - other.cx, py - other.cy);
+    return d > other.r;
+}
+
+// 计算两个圆的交点
+function circleIntersections(c1x, c1y, r1, c2x, c2y, r2) {
+    const dx = c2x - c1x, dy = c2y - c1y;
+    const d = Math.hypot(dx, dy);
+    if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) return [];
+    const a = (r1*r1 - r2*r2 + d*d) / (2*d);
+    const h = Math.sqrt(r1*r1 - a*a);
+    const mx = c1x + a*dx/d, my = c1y + a*dy/d;
+    const x3 = mx - h*dy/d, y3 = my + h*dx/d;
+    const x4 = mx + h*dy/d, y4 = my - h*dx/d;
+    const ang1 = Math.atan2(y3 - c1y, x3 - c1x);
+    const ang2 = Math.atan2(y4 - c1y, x4 - c1x);
+    return [normalizeAngle(ang1), normalizeAngle(ang2)];
+}
+
+// ================= 主绘制函数（花形互扣效果）=================
+function draw(now) {
+    const canvas = document.getElementById('board-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, CV, CV);
+
+    ctx.fillStyle = 'rgba(255,200,100,0.06)';
+    for (let i = 0; i < 50; i++) {
+        const bx = (i*79+23)%CV, by = (i*61+17)%CV;
+        ctx.beginPath(); ctx.arc(bx, by, 1.2+(i%3), 0, Math.PI*2); ctx.fill();
+    }
+
+    const pulse = now/200;
+
+    if (clipSlideAnim) {
+        const a = clipSlideAnim;
+        const rg = rings[a.idx];
+        const t = Math.min((now-a.start)/a.dur, 1);
+        const e = 1-Math.pow(1-t,3);
+        rg.clipT = a.fromT+(a.toT-a.fromT)*e;
+        if (t >= 1) {
+            rg.clipT = a.toT;
+            clipSlideAnim = null;
+            startFly(a.idx);
+        }
+    }
+
+    if (flyAnim) {
+        const a = flyAnim;
+        const rg = rings[a.idx];
+        const dt = 16;
+        rg.flyX += rg.flyVx*dt/16;
+        rg.flyY += rg.flyVy*dt/16;
+        rg.flyVy += 0.15;
+        rg.flyRot += rg.flyRotSpeed;
+        rg.flyScale = Math.max(0, rg.flyScale-0.005);
+        if (rg.flyY > CV+120 || rg.flyScale <= 0.01) {
+            rg.removed = true;
+            flyAnim = null;
+            updateStatus();
+            checkWin();
+        }
+    }
+
+    drawCenterDot(ctx);
+
+    const activeRings = rings.filter(r => !r.removed && !(flyAnim && flyAnim.idx === r.id && r.flyScale < 0.2));
+
+    // ===== 花形互扣：4层绘制 =====
+    // 每个C形环绕中心缺口朝内，缺口在gapDir方向
+    // 把每个环分成两段弧：
+    //   "外弧"：远离中心缺口的大半圆（从sAng逆时针经过gapDir+PI到eAng）
+    //   "内弧"：缺口附近的小弧（卡扣后面那一小段）
+    // 穿插技巧：偶数环先画外弧，奇数环后画外弧，这样相邻环一上一下形成编织
+    
+    // Layer 1: 所有偶数环的外弧（底层）
+    activeRings.forEach(rg => {
+        if (rg.id % 2 !== 0) return;
+        const shake = shakeOffset(rg.id, now);
+        const col = RING_COLORS[rg.colorIdx];
+        const alpha = canUnlock(rg.id) ? 1 : 0.55;
+        const dx = shake ? shake.x : 0;
+        const dy = shake ? shake.y : 0;
+        const cp = clipPositions(rg);
+        drawTubeArc(ctx, rg.cx+dx, rg.cy+dy, rg.r, rg.t, cp.sAng, cp.eAng, col, alpha);
+    });
+
+    // Layer 2: 所有奇数环的外弧（中层）
+    activeRings.forEach(rg => {
+        if (rg.id % 2 !== 1) return;
+        const shake = shakeOffset(rg.id, now);
+        const col = RING_COLORS[rg.colorIdx];
+        const alpha = canUnlock(rg.id) ? 1 : 0.55;
+        const dx = shake ? shake.x : 0;
+        const dy = shake ? shake.y : 0;
+        const cp = clipPositions(rg);
+        drawTubeArc(ctx, rg.cx+dx, rg.cy+dy, rg.r, rg.t, cp.sAng, cp.eAng, col, alpha);
+    });
+
+    // Layer 3: 管端圆头 + 卡扣（都在外弧之上）
+    activeRings.forEach(rg => {
+        const shake = shakeOffset(rg.id, now);
+        const col = RING_COLORS[rg.colorIdx];
+        const alpha = canUnlock(rg.id) ? 1 : 0.55;
+        const dx = shake ? shake.x : 0;
+        const dy = shake ? shake.y : 0;
+        const cp = clipPositions(rg);
+        if (rg.clipT < 0.15) {
+            drawTubeEnd(ctx, rg.cx+dx, rg.cy+dy, rg.r, rg.t, cp.sAng, col, alpha);
+            drawTubeEnd(ctx, rg.cx+dx, rg.cy+dy, rg.r, rg.t, cp.eAng, col, alpha);
+        }
+    });
+
+    activeRings.forEach(rg => {
+        const shake = shakeOffset(rg.id, now);
+        const dx = shake ? shake.x : 0;
+        const dy = shake ? shake.y : 0;
+        const cp = clipPositions(rg);
+        const canC = canUnlock(rg.id);
+        const isHint = (rg.id === hintIdx && now < hintUntil);
+        const glow = canC ? 0.5+Math.sin(pulse)*0.35 : 0;
+        const cw = rg.t*1.8, ch = rg.t*1.5;
+
+        const c1Hit = { x: cp.c1.x+dx, y: cp.c1.y+dy, r: cw*0.6 };
+        const c2Hit = { x: cp.c2.x+dx, y: cp.c2.y+dy, r: cw*0.6 };
+        rg._clipHits = [c1Hit, c2Hit];
+
+        drawOneClip(ctx, cp.c1.x+dx, cp.c1.y+dy, cp.c1.ang, cw, ch, rg.clipColor1, glow, isHint);
+        drawOneClip(ctx, cp.c2.x+dx, cp.c2.y+dy, cp.c2.ang, cw, ch, rg.clipColor2, glow, isHint);
+    });
+
+    // Layer 4: 环号数字
+    activeRings.forEach(rg => {
+        const shake = shakeOffset(rg.id, now);
+        const alpha = canUnlock(rg.id) ? 1 : 0.55;
+        const dx = shake ? shake.x : 0;
+        const dy = shake ? shake.y : 0;
+        const col = RING_COLORS[rg.colorIdx];
+        const numFs = Math.max(11, Math.round(rg.t*0.8));
+        ctx.save();
+        ctx.globalAlpha = alpha*0.9;
+        ctx.font = `bold ${numFs}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const numAng = rg.gapDir + Math.PI;
+        const nx = rg.cx+Math.cos(numAng)*rg.r;
+        const ny = rg.cy+Math.sin(numAng)*rg.r;
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.strokeText(String(rg.id+1), nx+dx, ny+dy);
+        ctx.fillStyle = '#3e2723';
+        ctx.fillText(String(rg.id+1), nx+dx, ny+dy);
+        ctx.restore();
+    });
+
+    // 飞行中的环
+    if (flyAnim) {
+        const rg = rings[flyAnim.idx];
+        ctx.save();
+        ctx.translate(rg.cx+rg.flyX, rg.cy+rg.flyY);
+        ctx.rotate(rg.flyRot);
+        ctx.scale(rg.flyScale, rg.flyScale);
+        ctx.globalAlpha = Math.min(1, rg.flyScale*2);
+        const col = RING_COLORS[rg.colorIdx];
+        const cp = clipPositions(rg);
+        drawTubeArc(ctx, 0, 0, rg.r, rg.t, cp.sAng, cp.eAng, col, 1);
+        if (rg.clipT < 0.15) {
+            drawTubeEnd(ctx, 0, 0, rg.r, rg.t, cp.sAng, col, 1);
+            drawTubeEnd(ctx, 0, 0, rg.r, rg.t, cp.eAng, col, 1);
+        }
+        const cw = rg.t*1.8, ch = rg.t*1.5;
+        drawOneClip(ctx, cp.c1.x, cp.c1.y, cp.c1.ang, cw, ch, rg.clipColor1, false, false);
+        drawOneClip(ctx, cp.c2.x, cp.c2.y, cp.c2.ang, cw, ch, rg.clipColor2, false, false);
+        ctx.restore();
+    }
+
+    if (hintIdx >= 0 && now < hintUntil && !rings[hintIdx].removed) {
+        const rg = rings[hintIdx];
+        if (rg._clipHits && (!flyAnim || flyAnim.idx !== hintIdx)) {
+            rg._clipHits.forEach(h => {
+                ctx.beginPath();
+                ctx.arc(h.x, h.y, h.r+10+Math.sin(pulse*1.5)*4, 0, Math.PI*2);
+                ctx.strokeStyle = `rgba(76,175,80,${0.55+Math.sin(pulse)*0.3})`;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            });
+        }
+    }
+}
+
+// ================= 点击检测 =================
+function findClipAt(mx, my) {
+    for (let i = 0; i < rings.length; i++) {
+        const rg = rings[i];
+        if (rg.removed) continue;
+        if (flyAnim && flyAnim.idx === i) continue;
+        if (rg._clipHits) {
+            for (const h of rg._clipHits) {
+                if (Math.hypot(mx-h.x, my-h.y) <= h.r+5) return i;
+            }
+        }
+    }
+    return -1;
+}
+
+function findRingAt(mx, my) {
+    for (let i = rings.length-1; i >= 0; i--) {
+        const rg = rings[i];
+        if (rg.removed) continue;
+        if (flyAnim && flyAnim.idx === i) continue;
+        const d = Math.hypot(mx-rg.cx, my-rg.cy);
+        if (d <= rg.r+rg.t/2+10 && d >= rg.r-rg.t/2-10) return i;
+    }
+    return -1;
+}
+
+// ================= 交互 =================
+document.getElementById('board-canvas').addEventListener('click', e => {
+    if (isGameOver || flyAnim || clipSlideAnim) return;
+    const rect = e.target.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)/rect.width*CV;
+    const my = (e.clientY-rect.top)/rect.height*CV;
+    const ci = findClipAt(mx, my);
+    if (ci >= 0) { clickRing(ci); return; }
+    const ri = findRingAt(mx, my);
+    if (ri >= 0 && !canUnlock(ri)) {
+        lockShake = ri;
+        lockShakeTime = performance.now();
+        showTip(whyNot(ri));
+    }
+});
+
+document.getElementById('board-canvas').addEventListener('mousemove', e => {
+    const rect = e.target.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)/rect.width*CV;
+    const my = (e.clientY-rect.top)/rect.height*CV;
+    if (flyAnim || clipSlideAnim || isGameOver) { e.target.style.cursor = 'default'; return; }
+    const ci = findClipAt(mx, my);
+    e.target.style.cursor = (ci >= 0 && canUnlock(ci)) ? 'pointer' : 'default';
+});
+
+function clickRing(idx) {
+    if (!canUnlock(idx)) {
+        lockShake = idx;
+        lockShakeTime = performance.now();
+        showTip(whyNot(idx));
+        return;
+    }
+    history.push({
+        states: rings.map(r => ({removed:r.removed, clipT:r.clipT})),
+        mc: moveCount
+    });
+    moveCount++;
+    clipSlideAnim = { idx, fromT:0, toT:1, start:performance.now(), dur: 300 };
+    const col = RING_COLORS[rings[idx].colorIdx].name;
+    showTip(`🔓 ${idx+1}号${col}环卡扣打开啦！`);
+    updateStatus();
+}
+
+function startFly(idx) {
+    const rg = rings[idx];
+    const ang = rg.gapDir + Math.PI + (Math.random()-0.5)*0.8;
+    const spd = 5+Math.random()*3;
+    rg.flyX=0; rg.flyY=0;
+    rg.flyVx=Math.cos(ang)*spd;
+    rg.flyVy=-6-Math.random()*2;
+    rg.flyRot=0;
+    rg.flyRotSpeed=(Math.random()-0.5)*0.3;
+    rg.flyScale=1;
+    flyAnim = { idx };
+}
+
+let tipTimer=null;
+function showTip(text) {
+    const el = document.getElementById('hint-tip');
+    el.textContent = text;
+    el.classList.add('show');
+    if (tipTimer) clearTimeout(tipTimer);
+    tipTimer = setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+function showHint() {
+    if (isGameOver||flyAnim||clipSlideAnim) return;
+    const i = findUnlockable();
+    if (i<0){showTip('🎉 全部解开啦！');return;}
+    hintIdx=i; hintUntil=performance.now()+3000;
+    const col = RING_COLORS[rings[i].colorIdx].name;
+    showTip(`💡 点${i+1}号${col}环的卡扣！`);
+}
+
+function undoMove() {
+    if (isGameOver||flyAnim||clipSlideAnim||!history.length) return;
+    const h = history.pop();
+    rings.forEach((rg,i)=>{
+        rg.removed=h.states[i].removed;
+        rg.clipT=h.states[i].clipT;
+        rg.flyX=0;rg.flyY=0;rg.flyVx=0;rg.flyVy=0;
+        rg.flyRot=0;rg.flyRotSpeed=0;rg.flyScale=1;
+    });
+    moveCount=h.mc;
+    lockShake=-1; hintIdx=-1;
+    updateStatus();
+}
+
+function updateStatus() {
+    document.getElementById('move-count').textContent = moveCount;
+    document.getElementById('solved-count').textContent = rings.filter(r=>r.removed).length;
+    document.getElementById('total-count').textContent = nRings;
+}
+
+function checkWin() {
+    if (rings.every(r=>r.removed)) {
+        isGameOver=true;
+        document.getElementById('win-desc').textContent = `${nRings}个环全部解开，共用了${moveCount}步！真棒！`;
+        document.getElementById('win-modal').classList.add('show');
+        startFireworks();
+    }
+}
+
+// ================= 烟花 =================
+const fwCanvas=document.getElementById('fireworks');
+const fwCtx=fwCanvas.getContext('2d');
+let fwParticles=[],fwAnimating=false;
+function resizeFW(){fwCanvas.width=window.innerWidth;fwCanvas.height=window.innerHeight;}
+window.addEventListener('resize',resizeFW);resizeFW();
+function startFireworks(){fwAnimating=true;for(let b=0;b<8;b++)setTimeout(()=>burst(Math.random()*fwCanvas.width,Math.random()*fwCanvas.height*0.5+50),b*220);animateFW();}
+function burst(x,y){const cs=['#ef5350','#66bb6a','#42a5f5','#ffa726','#ab47bc','#ffee58','#26c6da','#ec407a'];for(let i=0;i<36;i++){const a=Math.PI*2*i/36,s=2+Math.random()*3.5;fwParticles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color:cs[Math.floor(Math.random()*cs.length)]});}}
+function animateFW(){
+    if(!fwAnimating){fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);return;}
+    fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);
+    fwParticles=fwParticles.filter(p=>p.life>0);
+    fwParticles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.06;p.life-=0.01;fwCtx.globalAlpha=Math.max(p.life,0);fwCtx.fillStyle=p.color;fwCtx.beginPath();fwCtx.arc(p.x,p.y,3.2,0,Math.PI*2);fwCtx.fill();});
+    fwCtx.globalAlpha=1;
+    if(!fwParticles.length){fwAnimating=false;fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);return;}
+    requestAnimationFrame(animateFW);
+}
+function stopFW(){fwAnimating=false;fwParticles=[];fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);}
+
+// ================= 图例 =================
+function buildLegend() {
+    const el=document.getElementById('color-legend');
+    el.innerHTML='';
+    for(let i=0;i<nRings;i++){
+        const c=RING_COLORS[i%RING_COLORS.length];
+        const d=document.createElement('div');
+        d.className='legend-dot';
+        d.style.background=c.main;
+        d.textContent=i+1;
+        el.appendChild(d);
+    }
+}
+
+// ================= 初始化 =================
+function initGame() {
+    stopFW();
+    document.getElementById('win-modal').classList.remove('show');
+    flyAnim=null;clipSlideAnim=null;
+    lockShake=-1;hintIdx=-1;
+    nRings=parseInt(document.getElementById('diff').value);
+    moveCount=0;history=[];isGameOver=false;
+    layoutRings();
+    buildLegend();
+    updateStatus();
+}
+initGame();
+
+requestAnimationFrame(function frame(now){draw(now);requestAnimationFrame(frame);});
+</script>
+</body>
+</html>

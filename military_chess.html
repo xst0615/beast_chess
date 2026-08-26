@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二人军旗</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+        background: linear-gradient(135deg, #455a64 0%, #263238 100%);
+        min-height: 100vh; display: flex; flex-direction: column;
+        align-items: center; padding: 12px; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #333; overflow-x: hidden;
+    }
+    h1 {
+        color: #ffd54f; text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        margin-bottom: 12px; font-size: 24px; letter-spacing: 4px;
+    }
+    /* 主布局：游戏在左、规则在右 */
+    .main-layout {
+        display: flex; flex-wrap: nowrap; gap: 20px;
+        align-items: flex-start; justify-content: center;
+        width: 100%; max-width: 780px;
+    }
+    .game-section { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .rules-panel { flex-shrink: 1; width: 320px; min-width: 280px; position: sticky; top: 12px; }
+    @media (max-width: 760px) {
+        .main-layout { flex-wrap: wrap; }
+        .rules-panel { position: static; width: 100%; }
+    }
+    /* 状态栏 */
+    .status-bar {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        background: #37474f; padding: 8px 14px; border-radius: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 14px;
+    }
+    .status-bar .info { color: #eceff1; }
+    .status-bar .player-tag {
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 12px; border-radius: 16px; font-weight: bold;
+        transition: 0.3s; opacity: 0.45;
+    }
+    .status-bar .player-tag.active { opacity: 1; transform: scale(1.05); }
+    .status-bar .p1-tag { background: #b71c1c; color: #ffcdd2; }
+    .status-bar .p2-tag { background: #1a237e; color: #c5cae9; }
+    .status-bar button {
+        background: #ffc107; color: #37474f; border: none;
+        padding: 6px 14px; border-radius: 16px; cursor: pointer;
+        font-size: 13px; font-weight: bold; transition: 0.2s;
+    }
+    .status-bar button:hover { background: #ffb300; transform: translateY(-1px); }
+    .difficulty-select {
+        padding: 6px; border-radius: 8px; border: 2px solid #ddd;
+        font-weight: bold; outline: none; cursor: pointer; background: #fafafa;
+        font-size: 13px;
+    }
+    /* 棋盘 */
+    .board-wrap {
+        position: relative; width: 380px; height: 560px;
+        background: #eceff1; border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 3px solid #37474f;
+        overflow: hidden;
+    }
+    canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+    .thinking-mask {
+        position: absolute; inset: 0; background: rgba(255,255,255,0.7);
+        display: none; align-items: center; justify-content: center;
+        z-index: 10; border-radius: 13px; font-size: 16px; color: #37474f; font-weight: bold;
+    }
+    .thinking-mask::after { content: '🤔'; margin-left: 8px; animation: bounce 0.6s infinite alternate; }
+    @keyframes bounce { to { transform: translateY(-6px); } }
+    /* 战斗信息 */
+    .battle-info {
+        position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+        background: rgba(55,71,79,0.92); color: #ffd54f; padding: 6px 14px;
+        border-radius: 16px; font-size: 13px; font-weight: bold;
+        z-index: 5; opacity: 0; transition: opacity 0.3s; white-space: nowrap;
+    }
+    .battle-info.show { opacity: 1; }
+    /* 胜利弹窗 */
+    .win-modal {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+        display: none; align-items: center; justify-content: center; z-index: 100;
+    }
+    .modal-content {
+        background: white; padding: 30px 40px; border-radius: 20px;
+        text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        animation: popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    @keyframes popIn { from { transform: scale(0.5); opacity: 0; } }
+    .modal-content h2 { font-size: 26px; margin-bottom: 12px; }
+    .modal-content p { font-size: 16px; color: #666; margin-bottom: 20px; }
+    .modal-content button {
+        background: #ffc107; color: #37474f; border: none;
+        padding: 10px 28px; border-radius: 25px; font-size: 16px; cursor: pointer; font-weight: bold;
+    }
+    canvas#fireworks-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 99; display: none; }
+    /* 规则面板 */
+    .rules-panel details {
+        background: white; border-radius: 16px; overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #cfd8dc;
+    }
+    .rules-panel summary {
+        background: linear-gradient(135deg, #37474f, #546e7a);
+        color: white; padding: 14px 18px; cursor: pointer;
+        font-size: 16px; font-weight: bold; list-style: none;
+        display: flex; justify-content: space-between; align-items: center; letter-spacing: 2px;
+    }
+    .rules-panel summary::-webkit-details-marker { display: none; }
+    .rules-panel .arrow { transition: transform 0.3s; font-size: 12px; }
+    .rules-panel details[open] .arrow { transform: rotate(180deg); }
+    .rules-panel .panel-body { padding: 14px; }
+    .rule-item {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 10px 12px; margin-bottom: 8px;
+        background: #f5f5f5; border-radius: 10px; border: 1px solid #eceff1; transition: 0.2s;
+    }
+    .rule-item:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(55,71,79,0.08); }
+    .rule-item .rule-icon {
+        flex-shrink: 0; font-size: 20px; width: 34px; height: 34px;
+        background: #cfd8dc; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    }
+    .rule-item div { font-size: 14px; line-height: 1.6; color: #37474f; }
+    .rule-item b { color: #263238; font-size: 15px; }
+    @media (max-width: 420px) {
+        .board-wrap { width: 340px; height: 500px; }
+        h1 { font-size: 20px; }
+    }
+</style>
+</head>
+<body>
+    <h1>⚑ 二人军旗 ⚑</h1>
+    <div class="main-layout">
+        <div class="game-section">
+            <div class="status-bar">
+                <div class="player-tag p1-tag active" id="p1-tag">🔴 红方(你)</div>
+                <span class="info">VS</span>
+                <div class="player-tag p2-tag" id="p2-tag">🔵 蓝方(AI)</div>
+                <select id="difficulty" class="difficulty-select" onchange="initGame()">
+                    <option value="1">🌱 入门 (随机走棋)</option>
+                    <option value="2" selected>⚔️ 进阶 (贪心吃子)</option>
+                    <option value="3">🔥 高阶 (深度推演)</option>
+                </select>
+                <button onclick="undoMove()">↩ 悔棋</button>
+                <button onclick="initGame()">🔄 重开</button>
+            </div>
+            <div class="board-wrap">
+                <div class="battle-info" id="battle-info"></div>
+                <canvas id="board-canvas" width="380" height="560"></canvas>
+                <div class="thinking-mask" id="thinking-mask">AI 思考中</div>
+            </div>
+        </div>
+        <div class="rules-panel">
+            <details open>
+                <summary><span>📖 游戏规则</span><span class="arrow">▼</span></summary>
+                <div class="panel-body">
+                    <div class="rule-item">
+                        <span class="rule-icon">🏆</span>
+                        <div><b>获胜：</b>夺得对方军旗 ⚑，或消灭对方所有可动棋子。</div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">👆</span>
+                        <div><b>走法：</b>每次上下左右走一格，点击自己的棋子，绿色高亮是能去的位置。</div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">⚔️</span>
+                        <div><b>战斗：</b>撞到对方棋子时翻开比较，<b>等级高吃低</b>，同级<b>同归于尽</b>。</div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">💣</span>
+                        <div><b>炸弹：</b>遇到任何棋子都同归于尽，是用来换大子的。</div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">⛏️</span>
+                        <div><b>地雷 vs 工兵：</b>地雷不能动。普通棋子踩雷会亡，只有<b>工兵</b>能挖雷。</div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">⚑</span>
+                        <div><b>军旗：</b>不能移动，被对方走到就输。</div>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🎖️</span>
+                        <div><b>等级表：</b>司令 9 › 军长 8 › 师长 7 › 旅长 6 › 团长 5 › 营长 4 › 连长 3 › 排长 2 › 工兵 1</div>
+                    </div>
+                </div>
+            </details>
+        </div>
+    </div>
+    <canvas id="fireworks-canvas"></canvas>
+    <div class="win-modal" id="win-modal">
+        <div class="modal-content">
+            <h2 id="win-title"></h2>
+            <p id="win-desc"></p>
+            <button onclick="initGame()">🔄 再来一局</button>
+        </div>
+    </div>
+
+<script>
+// ============ 棋盘配置 ============
+const COLS = 5, ROWS = 12;        // 12 行，每方 6 行
+const CELL_W = 68, CELL_H = 42;   // 格子大小
+const OFFSET_X = 20, OFFSET_Y = 20;
+const MID_GAP = 10;               // 中间山界
+
+// 棋子类型定义
+// rank: 战斗等级（0=军旗/地雷/炸弹特殊, 1-9为战斗等级）
+const PIECE_TYPES = {
+    flag:      { name: '军旗', short: '旗', rank: 0,  count: 1, movable: false, color: '#ffd54f' },
+    bomb:      { name: '炸弹', short: '炸', rank: 0,  count: 2, movable: true,  color: '#ff7043' },
+    mine:      { name: '地雷', short: '雷', rank: 0,  count: 3, movable: false, color: '#795548' },
+    engineer:  { name: '工兵', short: '工', rank: 1,  count: 3, movable: true,  color: '#9ccc65' },
+    platoon:   { name: '排长', short: '排', rank: 2,  count: 3, movable: true,  color: '#81c784' },
+    company:   { name: '连长', short: '连', rank: 3,  count: 3, movable: true,  color: '#4dd0e1' },
+    battalion: { name: '营长', short: '营', rank: 4,  count: 2, movable: true,  color: '#4fc3f7' },
+    colonel:   { name: '团长', short: '团', rank: 5,  count: 2, movable: true,  color: '#7986cb' },
+    brigade:   { name: '旅长', short: '旅', rank: 6,  count: 2, movable: true,  color: '#9575cd' },
+    divcmd:    { name: '师长', short: '师', rank: 7,  count: 2, movable: true,  color: '#ba68c8' },
+    corp:      { name: '军长', short: '军', rank: 8,  count: 1, movable: true,  color: '#e57373' },
+    commander: { name: '司令', short: '令', rank: 9,  count: 1, movable: true,  color: '#f06292' },
+};
+const TYPE_KEYS = Object.keys(PIECE_TYPES);
+
+// ============ 游戏状态 ============
+const P1 = 1, P2 = 2;
+let board = [];   // 每格 {type, owner} 或 null
+let selectedNode = null;
+let validMoves = [];
+let currentPlayer = P1;
+let history = [];
+let isGameOver = false;
+let isAITurn = false;
+
+// 转换格子坐标 → 像素
+function cellPos(row, col) {
+    const y = OFFSET_Y + row * CELL_H + (row >= 6 ? MID_GAP : 0);
+    const x = OFFSET_X + col * CELL_W;
+    return { x: x + CELL_W/2, y: y + CELL_H/2 };
+}
+// 像素 → 格子
+function posToCell(x, y) {
+    const adjY = y - OFFSET_Y;
+    const totalH = ROWS * CELL_H + MID_GAP;
+    if (adjY < 0 || adjY > totalH) return null;
+    let row;
+    if (adjY < 6 * CELL_H) row = Math.floor(adjY / CELL_H);
+    else if (adjY < 6 * CELL_H + MID_GAP) return null; // 山界
+    else row = 6 + Math.floor((adjY - 6 * CELL_H - MID_GAP) / CELL_H);
+    if (row < 0 || row >= ROWS) return null;
+    const col = Math.floor((x - OFFSET_X) / CELL_W);
+    if (col < 0 || col >= COLS) return null;
+    return { row, col };
+}
+
+function initGame() {
+    document.getElementById('win-modal').style.display = 'none';
+    stopFireworks();
+    board = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+    // 生成棋子列表
+    const pieces = [];
+    TYPE_KEYS.forEach(k => {
+        for (let i = 0; i < PIECE_TYPES[k].count; i++) pieces.push(k);
+    });
+    // 洗牌
+    const shuffle = arr => { for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} return arr; };
+
+    // 玩家在下方 row 6-11，军旗放最后一行(11)中间
+    const p1Pieces = shuffle([...pieces]);
+    const flagIdx = p1Pieces.indexOf('flag');
+    // 把军旗放到第11行某列，其余随机铺
+    let p1Layout = [];
+    p1Pieces.forEach((t, i) => {
+        if (t !== 'flag') p1Layout.push(t);
+    });
+    // 先铺军旗到底行中间，再随机铺其余
+    board[11][2] = { type: 'flag', owner: P1 };
+    // 地雷尽量靠后排（row 9-11），提升策略性
+    const mines = p1Layout.filter(t => t === 'mine');
+    const others = p1Layout.filter(t => t !== 'mine');
+    p1Layout = [...others];
+    // 铺地雷到后排空位
+    let mineCells = [];
+    for (let r = 10; r <= 11; r++) for (let c = 0; c < COLS; c++) if (!board[r][c]) mineCells.push({r,c});
+    mineCells = shuffle(mineCells);
+    mines.forEach((t, i) => { if(mineCells[i]) board[mineCells[i].r][mineCells[i].c] = { type: t, owner: P1 }; });
+    // 铺其余
+    let restCells = [];
+    for (let r = 6; r <= 11; r++) for (let c = 0; c < COLS; c++) if (!board[r][c]) restCells.push({r,c});
+    restCells = shuffle(restCells);
+    p1Layout.forEach((t, i) => { if (restCells[i]) board[restCells[i].r][restCells[i].c] = { type: t, owner: P1 }; });
+
+    // AI 在上方 row 0-5，对称布局
+    const p2Pieces = shuffle([...pieces]);
+    board[0][2] = { type: 'flag', owner: P2 };
+    const mines2 = p2Pieces.filter(t => t === 'mine');
+    const others2 = p2Pieces.filter(t => t !== 'mine');
+    let mineCells2 = [];
+    for (let r = 0; r <= 1; r++) for (let c = 0; c < COLS; c++) if (!board[r][c]) mineCells2.push({r,c});
+    mineCells2 = shuffle(mineCells2);
+    mines2.forEach((t, i) => { if (mineCells2[i]) board[mineCells2[i].r][mineCells2[i].c] = { type: t, owner: P2 }; });
+    let restCells2 = [];
+    for (let r = 0; r <= 5; r++) for (let c = 0; c < COLS; c++) if (!board[r][c]) restCells2.push({r,c});
+    restCells2 = shuffle(restCells2);
+    others2.forEach((t, i) => { if (restCells2[i]) board[restCells2[i].r][restCells2[i].c] = { type: t, owner: P2 }; });
+
+    currentPlayer = P1;
+    selectedNode = null;
+    validMoves = [];
+    history = [];
+    isGameOver = false;
+    isAITurn = false;
+    document.getElementById('thinking-mask').style.display = 'none';
+    document.getElementById('battle-info').classList.remove('show');
+    updateUI();
+    draw();
+}
+
+// ============ 渲染 ============
+function draw() {
+    const canvas = document.getElementById('board-canvas');
+    const ctx = canvas.getContext('2d');
+    const sx = canvas.width / 380, sy = canvas.height / 560;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save(); ctx.scale(sx, sy);
+
+    // 背景
+    ctx.fillStyle = '#eceff1';
+    ctx.fillRect(0, 0, 380, 560);
+
+    // 棋盘网格
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const p = cellPos(r, c);
+            // 上方蓝方区域底色
+            let bg = '#fafafa';
+            if (r <= 5) bg = '#e3f2fd';
+            else bg = '#ffebee';
+            ctx.fillStyle = bg;
+            ctx.fillRect(p.x - CELL_W/2, p.y - CELL_H/2, CELL_W, CELL_H);
+            ctx.strokeStyle = '#b0bec5';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(p.x - CELL_W/2, p.y - CELL_H/2, CELL_W, CELL_H);
+        }
+    }
+
+    // 山界
+    const midY = OFFSET_Y + 6 * CELL_H;
+    ctx.fillStyle = '#cfd8dc';
+    ctx.fillRect(OFFSET_X, midY, COLS * CELL_W, MID_GAP);
+    ctx.fillStyle = '#90a4ae';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('— 山 界 —', OFFSET_X + COLS * CELL_W / 2, midY + MID_GAP - 2);
+
+    // 可走位置
+    validMoves.forEach(m => {
+        const p = cellPos(m.row, m.col);
+        ctx.fillStyle = 'rgba(76,175,80,0.35)';
+        ctx.fillRect(p.x - CELL_W/2, p.y - CELL_H/2, CELL_W, CELL_H);
+        ctx.strokeStyle = '#4caf50';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(p.x - CELL_W/2 + 1, p.y - CELL_H/2 + 1, CELL_W - 2, CELL_H - 2);
+    });
+
+    // 选中
+    if (selectedNode) {
+        const p = cellPos(selectedNode.row, selectedNode.col);
+        ctx.strokeStyle = '#ffc107';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(p.x - CELL_W/2 + 1.5, p.y - CELL_H/2 + 1.5, CELL_W - 3, CELL_H - 3);
+    }
+
+    // 棋子
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const piece = board[r][c];
+            if (!piece) continue;
+            const p = cellPos(r, c);
+            const info = PIECE_TYPES[piece.type];
+            // 圆角矩形棋子
+            const px = p.x - 24, py = p.y - 16, pw = 48, ph = 32;
+            ctx.fillStyle = piece.owner === P1 ? '#c62828' : '#1565c0';
+            roundRect(ctx, px, py, pw, ph, 6);
+            ctx.fill();
+            ctx.strokeStyle = info.color;
+            ctx.lineWidth = 2;
+            roundRect(ctx, px, py, pw, ph, 6);
+            ctx.stroke();
+            // 文字
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(info.short, p.x, p.y - 1);
+            // 等级小标
+            if (info.rank > 0) {
+                ctx.fillStyle = info.color;
+                ctx.font = 'bold 9px sans-serif';
+                ctx.fillText(info.rank, px + pw - 6, py + 6);
+            }
+        }
+    }
+    ctx.restore();
+}
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+}
+
+// ============ 走法 ============
+function getMoves(row, col) {
+    const piece = board[row][col];
+    if (!piece) return [];
+    if (!PIECE_TYPES[piece.type].movable) return [];
+    const moves = [];
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    for (const [dr, dc] of dirs) {
+        const nr = row + dr, nc = col + dc;
+        if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+        // 跨山界：row 5 与 row 6 之间可走
+        const target = board[nr][nc];
+        if (!target) {
+            moves.push({ row: nr, col: nc, attack: false });
+        } else if (target.owner !== piece.owner) {
+            moves.push({ row: nr, col: nc, attack: true });
+        }
+    }
+    return moves;
+}
+
+// ============ 战斗 ============
+function resolveBattle(attacker, defender) {
+    // 返回: 'win'(攻击者胜), 'lose'(攻击者败), 'tie'(同归)
+    // 炸弹：同归
+    if (attacker.type === 'bomb' || defender.type === 'bomb') return 'tie';
+    // 地雷：工兵克雷，其余被雷吃（攻击者亡，雷留）
+    if (defender.type === 'mine') {
+        if (attacker.type === 'engineer') return 'win';
+        return 'lose';  // 攻击者亡，地雷不动
+    }
+    // 军旗：被夺
+    if (defender.type === 'flag') return 'win';
+    // 等级比较
+    const aRank = PIECE_TYPES[attacker.type].rank;
+    const dRank = PIECE_TYPES[defender.type].rank;
+    if (aRank > dRank) return 'win';
+    if (aRank < dRank) return 'lose';
+    return 'tie';
+}
+
+function showBattle(text) {
+    const el = document.getElementById('battle-info');
+    el.textContent = text;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ============ 交互 ============
+function handleClick(e) {
+    if (isGameOver || isAITurn || currentPlayer !== P1) return;
+    const rect = e.target.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (380 / rect.width);
+    const y = (e.clientY - rect.top) * (560 / rect.height);
+    const cell = posToCell(x, y);
+    if (!cell) return;
+
+    const move = validMoves.find(m => m.row === cell.row && m.col === cell.col);
+    if (move) {
+        doMove(selectedNode, cell, move.attack);
+        return;
+    }
+    const piece = board[cell.row][cell.col];
+    if (piece && piece.owner === P1 && PIECE_TYPES[piece.type].movable) {
+        selectedNode = cell;
+        validMoves = getMoves(cell.row, cell.col);
+    } else {
+        selectedNode = null;
+        validMoves = [];
+    }
+    draw();
+}
+
+function doMove(from, to, isAttack) {
+    history.push({ board: board.map(row => row.map(c => c ? {...c} : null)), player: currentPlayer });
+    const attacker = board[from.row][from.col];
+    if (!isAttack) {
+        board[to.row][to.col] = attacker;
+        board[from.row][from.col] = null;
+        showBattle(`${PIECE_TYPES[attacker.type].name} 行军`);
+    } else {
+        const defender = board[to.row][to.col];
+        const result = resolveBattle(attacker, defender);
+        const aName = PIECE_TYPES[attacker.type].name;
+        const dName = PIECE_TYPES[defender.type].name;
+        if (result === 'win') {
+            board[to.row][to.col] = attacker;
+            board[from.row][from.col] = null;
+            showBattle(`${aName} 击败 ${dName} ✓`);
+        } else if (result === 'lose') {
+            // 攻击者亡（地雷场景，雷留下）
+            board[from.row][from.col] = null;
+            showBattle(`${aName} 踩雷阵亡 ✗`);
+        } else {
+            board[to.row][to.col] = null;
+            board[from.row][from.col] = null;
+            showBattle(`${aName} ⚔ ${dName} 同归于尽`);
+        }
+    }
+    selectedNode = null;
+    validMoves = [];
+    currentPlayer = currentPlayer === P1 ? P2 : P1;
+    updateUI();
+    draw();
+    if (checkWin()) return;
+    if (currentPlayer === P2 && !isGameOver) aiTurn();
+}
+
+// ============ 胜负 ============
+function checkWin() {
+    let p1Flag = false, p2Flag = false;
+    let p1Movable = 0, p2Movable = 0;
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const p = board[r][c];
+            if (!p) continue;
+            if (p.type === 'flag') {
+                if (p.owner === P1) p1Flag = true;
+                else p2Flag = true;
+            }
+            if (PIECE_TYPES[p.type].movable) {
+                if (p.owner === P1) p1Movable++;
+                else p2Movable++;
+            }
+        }
+    }
+    if (!p2Flag) { triggerWin(P1, '夺得敌方军旗！'); return true; }
+    if (!p1Flag) { triggerWin(P2, '军旗被夺！'); return true; }
+    if (p2Movable === 0) { triggerWin(P1, '对方已无可用之兵！'); return true; }
+    if (p1Movable === 0) { triggerWin(P2, '你已无可用之兵！'); return true; }
+    return false;
+}
+function triggerWin(winner, desc) {
+    isGameOver = true; isAITurn = false;
+    document.getElementById('thinking-mask').style.display = 'none';
+    const title = document.getElementById('win-title');
+    if (winner === P1) {
+        title.innerHTML = '🎉 红方 (你) 获胜!';
+        title.style.color = '#c62828';
+        startFireworks();
+    } else {
+        title.innerHTML = '💀 蓝方 (AI) 获胜';
+        title.style.color = '#1565c0';
+    }
+    document.getElementById('win-desc').innerText = desc;
+    document.getElementById('win-modal').style.display = 'flex';
+}
+
+// ============ AI ============
+function aiTurn() {
+    isAITurn = true;
+    document.getElementById('thinking-mask').style.display = 'flex';
+    setTimeout(() => {
+        const move = pickAIMove();
+        if (move) {
+            doMove(move.from, move.to, move.attack);
+        } else {
+            triggerWin(P1, 'AI 无路可走！');
+        }
+        isAITurn = false;
+        document.getElementById('thinking-mask').style.display = 'none';
+    }, 400);
+}
+
+function pickAIMove() {
+    const diff = parseInt(document.getElementById('difficulty').value);
+    // 收集所有可行动作
+    const actions = [];
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const piece = board[r][c];
+            if (!piece || piece.owner !== P2) continue;
+            if (!PIECE_TYPES[piece.type].movable) continue;
+            const moves = getMoves(r, c);
+            moves.forEach(m => actions.push({ from: {row:r,col:c}, to: {row:m.row,col:m.col}, attack: m.attack, piece }));
+        }
+    }
+    if (actions.length === 0) return null;
+
+    if (diff === 1) {
+        // 入门：完全随机
+        return actions[Math.floor(Math.random() * actions.length)];
+    }
+
+    // 通用评分函数（进阶/高阶共用）
+    function scoreAction(a, lookahead) {
+        let score = 0;
+        score += (a.to.row - a.from.row) * 2;  // 向下推进
+        if (a.attack) {
+            const target = board[a.to.row][a.to.col];
+            const result = resolveBattle(a.piece, target);
+            const tRank = PIECE_TYPES[target.type].rank;
+            const aRank = PIECE_TYPES[a.piece.type].rank;
+            if (target.type === 'flag') score += 1000;
+            else if (result === 'win') score += 20 + tRank * 3;
+            else if (result === 'tie') score += tRank * 3 - aRank * 2;
+            else score -= 30;
+        } else if (lookahead) {
+            // 高阶：评估移动后是否会被玩家反吃（简化威胁检查）
+            const nb = board.map(row => row.map(c => c ? {...c} : null));
+            nb[a.to.row][a.to.col] = a.piece;
+            nb[a.from.row][a.from.col] = null;
+            // 检查落点周围玩家棋子是否构成威胁
+            let threat = 0;
+            const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            dirs.forEach(([dr, dc]) => {
+                const nr = a.to.row + dr, nc = a.to.col + dc;
+                if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) return;
+                const enemy = nb[nr][nc];
+                if (enemy && enemy.owner === P1) {
+                    const res = resolveBattle(enemy, a.piece);
+                    if (res === 'win') threat += PIECE_TYPES[a.piece.type].rank * 3 + 5;
+                }
+            });
+            score -= threat;
+            // 高阶：工兵主动去找雷（朝玩家后排推进）
+            if (a.piece.type === 'engineer') score += (a.to.row - 6) * 0.5;
+        }
+        score += Math.random() * 1.5;
+        return score;
+    }
+
+    let best = null, bestScore = -Infinity;
+    actions.forEach(a => {
+        const score = scoreAction(a, diff === 3);
+        if (score > bestScore) { bestScore = score; best = a; }
+    });
+    return best;
+}
+
+// ============ 工具 ============
+function undoMove() {
+    if (isAITurn || isGameOver) return;
+    if (history.length >= 2) {
+        const last = history.pop();
+        const prev = history.pop();
+        board = prev.board.map(row => row.map(c => c ? {...c} : null));
+        currentPlayer = P1;
+    } else if (history.length === 1) {
+        const prev = history.pop();
+        board = prev.board.map(row => row.map(c => c ? {...c} : null));
+        currentPlayer = P1;
+    }
+    selectedNode = null;
+    validMoves = [];
+    updateUI();
+    draw();
+}
+function updateUI() {
+    let p1 = 0, p2 = 0;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        const p = board[r][c];
+        if (!p) continue;
+        if (p.owner === P1) p1++; else p2++;
+    }
+    document.getElementById('p1-tag').classList.toggle('active', currentPlayer === P1 && !isGameOver);
+    document.getElementById('p2-tag').classList.toggle('active', currentPlayer === P2 && !isGameOver);
+}
+
+// ============ 烟花 ============
+let fwAnim = null;
+function startFireworks() {
+    const c = document.getElementById('fireworks-canvas');
+    c.width = window.innerWidth; c.height = window.innerHeight;
+    c.style.display = 'block';
+    const ctx = c.getContext('2d');
+    const particles = [];
+    function burst(x, y) {
+        const colors = ['#ff5252','#ffd54f','#69f0ae','#40c4ff','#e040fb'];
+        for (let i = 0; i < 40; i++) {
+            const a = Math.random() * Math.PI * 2, s = Math.random() * 5 + 2;
+            particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 60, c: colors[i%colors.length] });
+        }
+    }
+    let t = 0;
+    fwAnim = setInterval(() => {
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        if (t % 30 === 0) burst(Math.random()*c.width*0.8+c.width*0.1, Math.random()*c.height*0.5+c.height*0.1);
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--;
+            if (p.life <= 0) { particles.splice(i, 1); return; }
+            ctx.fillStyle = p.c; ctx.globalAlpha = p.life / 60;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.globalAlpha = 1; t++;
+    }, 30);
+}
+function stopFireworks() {
+    if (fwAnim) { clearInterval(fwAnim); fwAnim = null; }
+    const c = document.getElementById('fireworks-canvas');
+    if (c) { c.style.display = 'none'; c.getContext('2d').clearRect(0, 0, c.width, c.height); }
+}
+
+// ============ 启动 ============
+document.getElementById('board-canvas').addEventListener('click', handleClick);
+initGame();
+</script>
+</body>
+</html>

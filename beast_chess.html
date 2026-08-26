@@ -24,8 +24,19 @@
         }
 
         h1 {
-            color: #333; margin: 15px 0 5px 0; font-size: 26px;
+            color: #333; margin: 15px 0 10px 0; font-size: 26px;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* 主布局：游戏在左、规则在右，强制左右划分 */
+        .main-layout {
+            display: flex; flex-wrap: nowrap;
+            justify-content: center; align-items: flex-start;
+            gap: 20px; padding: 0 12px 20px 12px;
+        }
+        .game-section {
+            display: flex; flex-direction: column; align-items: center;
+            flex-shrink: 0; /* 棋盘区域不被压缩 */
         }
 
         .status-bar {
@@ -126,14 +137,118 @@
             justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #333;
         }
 
-        @media (max-width: 400px) { :root { --cell-size: 45px; } .status-bar { width: 320px; } .piece { width: 38px; height: 38px; font-size: 22px; } }
+        /* 规则说明面板 */
+        .rules-panel {
+            width: 340px; flex-shrink: 1;
+            background: #FAFBF6; border: 1px solid #E3E9DD; border-radius: 16px;
+            box-shadow: 0 6px 16px rgba(74, 107, 58, 0.12); box-sizing: border-box;
+            overflow: hidden;
+            position: sticky; top: 10px; /* 页面滚动时规则保持可见 */
+            align-self: flex-start;
+        }
+        .rules-panel summary {
+            padding: 16px 18px; cursor: pointer; font-weight: bold;
+            font-size: 18px; list-style: none; user-select: none;
+            display: flex; justify-content: space-between; align-items: center;
+            color: white; letter-spacing: 1px;
+            background: linear-gradient(135deg, #6B9054, #89C765);
+            transition: filter 0.2s;
+        }
+        .rules-panel summary::-webkit-details-marker { display: none; }
+        .rules-panel summary:hover { filter: brightness(1.06); }
+        .rules-panel summary .arrow {
+            transition: transform 0.3s; font-size: 11px; color: white;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .rules-panel[open] summary .arrow { transform: rotate(180deg); }
+        .rules-body { padding: 14px 14px 16px 14px; }
+
+        /* 食物链等级卡 */
+        .food-chain {
+            background: white; border: 1px dashed #C8D6BE; border-radius: 12px;
+            padding: 12px 8px; margin-bottom: 14px;
+            display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px;
+            box-shadow: 0 2px 4px rgba(74,107,58,0.06);
+        }
+        .food-chain .title {
+            width: 100%; text-align: center; font-size: 13px; font-weight: bold;
+            color: #7A8B6E; letter-spacing: 3px; margin-bottom: 8px;
+        }
+        .food-chain .chip {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: #F4F8EF; border: 1px solid #E3E9DD;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.05);
+            transition: transform 0.15s;
+        }
+        .food-chain .chip:hover { transform: scale(1.25); }
+        .food-chain .link { color: #A8B89A; font-size: 12px; margin: 0 1px; }
+        .food-chain .hint { width: 100%; text-align: center; color: #9AA88E; font-size: 12px; margin-top: 8px; }
+
+        /* 规则条目卡（童趣文字版） */
+        .rule-item {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 10px 12px; margin-bottom: 8px;
+            background: white; border: 1px solid #EDF1E8; border-radius: 12px;
+            font-size: 14px; color: #5A6552; line-height: 1.5;
+            box-shadow: 0 2px 4px rgba(74,107,58,0.05);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .rule-item:last-child { margin-bottom: 0; }
+        .rule-item:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(74,107,58,0.14); }
+        .rule-icon {
+            font-size: 22px; flex-shrink: 0;
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            background: #F0F6E8;
+        }
+        .rule-item b { color: #3E4A36; font-size: 15px; }
+
+        /* 视频教程卡片 */
+        .video-card {
+            background: white; border: 1px solid #EDF1E8; border-radius: 12px;
+            padding: 12px; margin-top: 14px;
+            box-shadow: 0 2px 4px rgba(74,107,58,0.05);
+        }
+        .video-card .video-title {
+            font-size: 13px; font-weight: bold; color: #7A8B6E;
+            letter-spacing: 3px; margin-bottom: 8px; text-align: center;
+        }
+        .video-card .video-wrap {
+            position: relative; width: 100%; padding-top: 56.25%; /* 16:9 */
+            border-radius: 8px; overflow: hidden; background: #000;
+        }
+        .video-card .video-wrap iframe {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        }
+        .video-card .video-link {
+            display: block; text-align: center; margin-top: 8px;
+            font-size: 12px; color: #6B9054; text-decoration: none;
+        }
+        .video-card .video-link:hover { text-decoration: underline; }
+
+        /* 手机：空间不足时回退为上下堆叠，保证棋盘可用 */
+        @media (max-width: 760px) {
+            .main-layout { flex-wrap: wrap; }
+            .rules-panel { position: static; width: 360px; }
+        }
+        @media (max-width: 400px) {
+            :root { --cell-size: 45px; }
+            .status-bar { width: 320px; }
+            .rules-panel { width: 320px; }
+            .piece { width: 38px; height: 38px; font-size: 22px; }
+        }
     </style>
 </head>
 <body>
 
     <h1>🐾 Q萌斗兽棋 - 人机版</h1>
-    
-    <div class="status-bar">
+
+    <div class="main-layout">
+        <div class="game-section">
+            <div class="status-bar">
         <div class="top-controls">
             <div id="turn-indicator" class="turn-indicator turn-red">红方 (你) 回合</div>
             <select id="difficulty" class="difficulty-select" onchange="initGame()">
@@ -151,10 +266,41 @@
         </div>
     </div>
 
-    <div class="board-container">
-        <div class="board" id="board"></div>
-        <div class="thinking-mask" id="thinking-mask">🤖 蓝方思考中...</div>
-    </div>
+            <div class="board-container">
+                <div class="board" id="board"></div>
+                <div class="thinking-mask" id="thinking-mask">🤖 蓝方思考中...</div>
+            </div>
+        </div>
+
+        <!-- 游戏规则（与棋盘并排常驻显示，点击标题可收起） -->
+        <details class="rules-panel" id="rules-panel" open>
+        <summary>📖 小动物怎么玩 <span class="arrow">▼</span></summary>
+        <div class="rules-body">
+            <div class="food-chain">
+                <div class="title">🐘 谁更厉害？</div>
+                <span class="chip">🐘</span><span class="link">›</span><span class="chip">🦁</span><span class="link">›</span><span class="chip">🐯</span><span class="link">›</span><span class="chip">🐆</span><span class="link">›</span><span class="chip">🐺</span><span class="link">›</span><span class="chip">🐶</span><span class="link">›</span><span class="chip">🐱</span><span class="link">›</span><span class="chip">🐭</span>
+                <span class="hint">左边大动物可以吃右边的！</span>
+            </div>
+            <div class="rule-item"><span class="rule-icon">🏆</span><div><b>怎么赢：</b>进到对面的大房子 ⛺ 就赢啦！</div></div>
+            <div class="rule-item"><span class="rule-icon">👆</span><div><b>怎么走：</b>每次走一格，看到 ⭐ 就能走过去。</div></div>
+            <div class="rule-item"><span class="rule-icon">🐭</span><div><b>老鼠最聪明：</b>小老鼠 🐭 可以打大象 🐘！</div></div>
+            <div class="rule-item"><span class="rule-icon">🌊</span><div><b>水：</b>只有小老鼠会游泳，别的动物怕水。</div></div>
+            <div class="rule-item"><span class="rule-icon">🦁</span><div><b>狮子老虎会跳：</b>狮 🦁 虎 🐯 能跳过河！</div></div>
+            <div class="rule-item"><span class="rule-icon">🕸️</span><div><b>陷阱：</b>坏人掉进陷阱，谁都打得过他！</div></div>
+
+            <!-- 视频教程 -->
+            <div class="video-card">
+                <div class="video-title">📺 视频教程</div>
+                <div class="video-wrap">
+                    <iframe src="https://player.bilibili.com/player.html?bvid=BV1ri421R7jN&page=1&autoplay=0&danmaku=0&high_quality=1"
+                            scrolling="no" frameborder="no" allowfullscreen="true"
+                            title="斗兽棋教程视频"></iframe>
+                </div>
+                <a class="video-link" href="https://www.bilibili.com/video/BV1ri421R7jN/" target="_blank" rel="noopener">在 B 站观看完整视频 ↗</a>
+            </div>
+        </div>
+    </details>
+    </div><!-- /main-layout -->
 
     <div class="modal" id="win-modal">
         <div class="modal-content">

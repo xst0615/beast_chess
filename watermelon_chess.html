@@ -116,40 +116,183 @@
         }
         @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
+        /* 主布局：游戏在左、规则在右，强制左右划分 */
+        .main-layout {
+            display: flex; flex-wrap: nowrap;
+            justify-content: center; align-items: flex-start;
+            gap: 20px; padding: 0 12px 20px 12px;
+        }
+        .game-section {
+            display: flex; flex-direction: column; align-items: center;
+            flex-shrink: 0; /* 棋盘区域不被压缩 */
+        }
+
+        /* 规则说明面板 */
+        .rules-panel {
+            width: 340px; flex-shrink: 1;
+            background: #FAFCF8; border: 1px solid #DCEBDD; border-radius: 16px;
+            box-shadow: 0 6px 16px rgba(46, 125, 50, 0.12); box-sizing: border-box;
+            overflow: hidden;
+            position: sticky; top: 10px; /* 页面滚动时规则保持可见 */
+            align-self: flex-start;
+        }
+        .rules-panel summary {
+            padding: 16px 18px; cursor: pointer; font-weight: bold;
+            font-size: 18px; list-style: none; user-select: none;
+            display: flex; justify-content: space-between; align-items: center;
+            color: white; letter-spacing: 1px;
+            background: linear-gradient(135deg, #2E7D32, #66BB6A);
+            transition: filter 0.2s;
+        }
+        .rules-panel summary::-webkit-details-marker { display: none; }
+        .rules-panel summary:hover { filter: brightness(1.06); }
+        .rules-panel summary .arrow {
+            transition: transform 0.3s; font-size: 11px; color: white;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .rules-panel[open] summary .arrow { transform: rotate(180deg); }
+        .rules-body { padding: 14px 14px 16px 14px; }
+
+        /* 双方棋子介绍卡 */
+        .pieces-intro {
+            background: white; border: 1px dashed #C8E6C9; border-radius: 12px;
+            padding: 12px 8px; margin-bottom: 14px;
+            display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px;
+            box-shadow: 0 2px 4px rgba(46,125,50,0.06);
+        }
+        .pieces-intro .title {
+            width: 100%; text-align: center; font-size: 13px; font-weight: bold;
+            color: #6B8E6E; letter-spacing: 3px; margin-bottom: 8px;
+        }
+        .pieces-intro .chip {
+            width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.05);
+            transition: transform 0.15s;
+        }
+        .pieces-intro .chip.red { background: #FFEBEE; border: 1px solid #FFCDD2; }
+        .pieces-intro .chip.yellow { background: #FFF8E1; border: 1px solid #FFE082; }
+        .pieces-intro .chip:hover { transform: scale(1.25); }
+        .pieces-intro .vs { color: #A8B89A; font-size: 13px; font-weight: bold; margin: 0 6px; }
+        .pieces-intro .hint { width: 100%; text-align: center; color: #9AA88E; font-size: 12px; margin-top: 8px; }
+
+        /* 规则条目卡（童趣文字版） */
+        .rule-item {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 10px 12px; margin-bottom: 8px;
+            background: white; border: 1px solid #EDF3EE; border-radius: 12px;
+            font-size: 14px; color: #5A6552; line-height: 1.5;
+            box-shadow: 0 2px 4px rgba(46,107,58,0.05);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .rule-item:last-child { margin-bottom: 0; }
+        .rule-item:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(46,107,58,0.14); }
+        .rule-icon {
+            font-size: 22px; flex-shrink: 0;
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            background: #F0F6E8;
+        }
+        .rule-item b { color: #3E4A36; font-size: 15px; }
+
+        /* 视频教程卡片 */
+        .video-card {
+            background: white; border: 1px solid #EDF3EE; border-radius: 12px;
+            padding: 12px; margin-top: 14px;
+            box-shadow: 0 2px 4px rgba(46,125,50,0.05);
+        }
+        .video-card .video-title {
+            font-size: 13px; font-weight: bold; color: #6B8E6E;
+            letter-spacing: 3px; margin-bottom: 8px; text-align: center;
+        }
+        .video-card .video-wrap {
+            position: relative; width: 100%; padding-top: 56.25%; /* 16:9 */
+            border-radius: 8px; overflow: hidden; background: #000;
+        }
+        .video-card .video-wrap iframe {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        }
+        .video-card .video-link {
+            display: block; text-align: center; margin-top: 8px;
+            font-size: 12px; color: #2E7D32; text-decoration: none;
+        }
+        .video-card .video-link:hover { text-decoration: underline; }
+
+        /* 手机：空间不足时回退为上下堆叠，保证棋盘可用 */
+        @media (max-width: 760px) {
+            .main-layout { flex-wrap: wrap; }
+            .rules-panel { position: static; width: 380px; }
+        }
         @media (max-width: 420px) {
             .status-bar { width: 340px; }
             .game-area { width: 340px; height: 340px; }
+            .rules-panel { width: 340px; }
         }
     </style>
 </head>
 <body>
 
     <h1>🍉 Q萌西瓜棋</h1>
-    
-    <div class="status-bar">
-        <div class="top-controls">
-            <div id="turn-indicator" class="turn-indicator turn-p1">红西瓜 (你)</div>
-            <select id="difficulty" class="difficulty-select" onchange="initGame()">
-                <option value="1">🌱 入门 (随机走棋)</option>
-                <option value="2">⚔️ 进阶 (贪心吃子)</option>
-                <option value="3" selected>🔥 高阶 (深度推演)</option>
-            </select>
-        </div>
-        <div class="top-controls btn-group">
-            <div style="font-size:13px; color:#555; font-weight:bold;">
-                红🍉: <span id="p1-count">6</span> | 黄🍈: <span id="p2-count">6</span>
-            </div>
-            <div>
-                <button id="btn-undo" onclick="undo()">⬅️ 悔棋</button>
-                <button onclick="initGame()">🔄 重开</button>
-            </div>
-        </div>
-    </div>
 
-    <div class="game-area" id="game-area">
-        <canvas id="board-canvas" width="400" height="400"></canvas>
-        <div class="pieces-layer" id="pieces-layer"></div>
-        <div class="thinking-mask" id="thinking-mask">🤖 黄西瓜思考中...</div>
+    <div class="main-layout">
+        <div class="game-section">
+            <div class="status-bar">
+                <div class="top-controls">
+                    <div id="turn-indicator" class="turn-indicator turn-p1">红西瓜 (你)</div>
+                    <select id="difficulty" class="difficulty-select" onchange="initGame()">
+                        <option value="1">🌱 入门 (随机走棋)</option>
+                        <option value="2">⚔️ 进阶 (贪心吃子)</option>
+                        <option value="3" selected>🔥 高阶 (深度推演)</option>
+                    </select>
+                </div>
+                <div class="top-controls btn-group">
+                    <div style="font-size:13px; color:#555; font-weight:bold;">
+                        红🍉: <span id="p1-count">6</span> | 黄🍈: <span id="p2-count">6</span>
+                    </div>
+                    <div>
+                        <button id="btn-undo" onclick="undo()">⬅️ 悔棋</button>
+                        <button onclick="initGame()">🔄 重开</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-area" id="game-area">
+                <canvas id="board-canvas" width="400" height="400"></canvas>
+                <div class="pieces-layer" id="pieces-layer"></div>
+                <div class="thinking-mask" id="thinking-mask">🤖 黄西瓜思考中...</div>
+            </div>
+        </div>
+
+        <!-- 游戏规则（与棋盘并排常驻显示，点击标题可收起） -->
+        <details class="rules-panel" id="rules-panel" open>
+            <summary>📖 西瓜棋怎么玩 <span class="arrow">▼</span></summary>
+            <div class="rules-body">
+                <div class="pieces-intro">
+                    <div class="title">🍉 谁和谁比赛？</div>
+                    <span class="chip red">🍉</span><span class="chip red">🍉</span><span class="chip red">🍉</span><span class="chip red">🍉</span><span class="chip red">🍉</span><span class="chip red">🍉</span>
+                    <span class="vs">VS</span>
+                    <span class="chip yellow">🍈</span><span class="chip yellow">🍈</span><span class="chip yellow">🍈</span><span class="chip yellow">🍈</span><span class="chip yellow">🍈</span><span class="chip yellow">🍈</span>
+                    <span class="hint">你有 6 个红西瓜，电脑有 6 个黄西瓜</span>
+                </div>
+                <div class="rule-item"><span class="rule-icon">🏆</span><div><b>怎么赢：</b>把对方的西瓜吃到只剩 2 个，或让它没路可走，就赢啦！</div></div>
+                <div class="rule-item"><span class="rule-icon">👆</span><div><b>怎么走：</b>每次沿着线走一步，看到 ⭐ 就能走过去。</div></div>
+                <div class="rule-item"><span class="rule-icon">😋</span><div><b>怎么吃：</b>把对方的西瓜围起来，让它旁边没有空位，就被吃掉啦！</div></div>
+                <div class="rule-item"><span class="rule-icon">🤝</span><div><b>轮流玩：</b>你走一步，电脑走一步，轮流来。</div></div>
+
+                <!-- 视频教程 -->
+                <div class="video-card">
+                    <div class="video-title">📺 视频教程</div>
+                    <div class="video-wrap">
+                        <iframe src="https://player.bilibili.com/player.html?bvid=BV1wXonY7EYT&page=1&autoplay=0&danmaku=0&high_quality=1"
+                                scrolling="no" frameborder="no" allowfullscreen="true"
+                                title="西瓜棋教程视频"></iframe>
+                    </div>
+                    <a class="video-link" href="https://www.bilibili.com/video/BV1wXonY7EYT/" target="_blank" rel="noopener">在 B 站观看完整视频 ↗</a>
+                </div>
+            </div>
+        </details>
     </div>
 
     <!-- 胜利弹窗 -->
@@ -163,58 +306,42 @@
     <canvas id="fireworks-canvas"></canvas>
 
 <script>
-    // ---------------- 棋盘图结构生成 (21个节点) ----------------
+    // ---------------- 棋盘图结构生成 (经典17个节点) ----------------
+    // 两个同心圆 + 8条米字放射线（与视频教程同款）
     // 节点 0: 中心
     // 节点 1-8: 内圈 (N, NE, E, SE, S, SW, W, NW)
     // 节点 9-16: 外圈 (N, NE, E, SE, S, SW, W, NW)
-    // 节点 17-20: 外部半圆顶点 (N, E, S, W)
     const CX = 200, CY = 200;
-    const R1 = 55, R2 = 125, R3 = 190;
-    const nodes = [{x: CX, y: CY}]; // 0
-    
+    const R1 = 65, R2 = 160; // 内圆、外圆半径
+    const ANGLES = [];
+    for(let i=0; i<8; i++) ANGLES.push((i * 45 - 90) * Math.PI / 180);
+
+    const nodes = [{x: CX, y: CY}]; // 0 中心
     // 生成内圈和外圈坐标
     for(let r of [R1, R2]) {
         for(let i=0; i<8; i++) {
-            let a = (i * 45 - 90) * Math.PI / 180;
-            nodes.push({x: CX + r * Math.cos(a), y: CY + r * Math.sin(a)});
+            nodes.push({x: CX + r * Math.cos(ANGLES[i]), y: CY + r * Math.sin(ANGLES[i])});
         }
     }
-    // 生成4个外顶点
-    [0, 2, 4, 6].forEach(i => {
-        let a = (i * 45 - 90) * Math.PI / 180;
-        nodes.push({x: CX + R3 * Math.cos(a), y: CY + R3 * Math.sin(a)});
-    });
+    const NUM_NODES = nodes.length; // 17
 
-    // 定义图的连通边 (邻接表)
-    const edges = [
-        [1,2,3,4,5,6,7,8], // 0 中心
-        [0,8,2,9],   // 1 N内
-        [0,1,3,10],  // 2 NE内
-        [0,2,4,11],  // 3 E内
-        [0,3,5,12],  // 4 SE内
-        [0,4,6,13],  // 5 S内
-        [0,5,7,14],  // 6 SW内
-        [0,6,8,15],  // 7 W内
-        [0,7,1,16],  // 8 NW内
-        [1,16,10,17], // 9 N外
-        [2,9,11,17,18], // 10 NE外 (连接N顶点和E顶点)
-        [3,10,12,18], // 11 E外
-        [4,11,13,18,19], // 12 SE外
-        [5,12,14,19], // 13 S外
-        [6,13,15,19,20], // 14 SW外
-        [7,14,16,20], // 15 W外
-        [8,15,9,20,17], // 16 NW外
-        [9,16,10], // 17 N顶点
-        [11,10,12], // 18 E顶点
-        [13,12,14], // 19 S顶点
-        [15,14,16]  // 20 W顶点
-    ];
+    // 定义图的连通边 (邻接表)：米字线 + 内外圆环
+    const edges = [];
+    edges.push([1,2,3,4,5,6,7,8]); // 0 中心：连内圈8点
+    for(let i=0; i<8; i++) {
+        // 内圈点：连中心 + 左右内圈邻居 + 对应外圈点
+        edges.push([0, 1 + (i+1)%8, 1 + (i+7)%8, 9 + i]);
+    }
+    for(let i=0; i<8; i++) {
+        // 外圈点：连左右外圈邻居 + 对应内圈点
+        edges.push([9 + (i+1)%8, 9 + (i+7)%8, 1 + i]);
+    }
 
     // ---------------- 游戏状态与常量 ----------------
     const P1 = 1;  // 玩家 (红🍉)
     const P2 = -1; // AI (黄🍈)
     
-    let board = new Int8Array(21); // 0=空, 1=P1, -1=P2
+    let board = new Int8Array(NUM_NODES); // 0=空, 1=P1, -1=P2
     let currentPlayer = P1;
     let selectedNode = null;
     let validMoves = [];
@@ -222,9 +349,10 @@
     let isGameOver = false;
     let isAITurn = false;
 
-    // 初始化阵型 (完美对称)
-    const INIT_P1 = [17, 16, 9, 10, 8, 2]; // 顶部
-    const INIT_P2 = [19, 14, 13, 12, 6, 4]; // 底部
+    // 初始化阵型 (经典摆法，双方各占半边：外圈3子+内圈3子)
+    // AI黄🍈在上方，玩家红🍉在下方
+    const INIT_P1 = [13, 12, 14, 5, 4, 6];  // 底部：外S/SE/SW + 内S/SE/SW
+    const INIT_P2 = [9, 10, 16, 1, 2, 8];   // 顶部：外N/NE/NW + 内N/NE/NW
 
     // ---------------- 初始化与渲染 ----------------
     function drawBoard() {
@@ -239,34 +367,25 @@
         ctx.beginPath();
         ctx.arc(CX, CY, 195, 0, Math.PI*2);
         ctx.fillStyle = '#C8E6C9'; ctx.fill();
-        ctx.lineWidth = 4; ctx.strokeStyle = 'var(--line-color)'; ctx.stroke();
+        ctx.lineWidth = 4; ctx.strokeStyle = '#1B5E20'; ctx.stroke();
 
-        // 绘制所有连线
+        // 绘制外圆（棋盘边界）
+        ctx.beginPath();
+        ctx.arc(CX, CY, R2, 0, Math.PI*2);
+        ctx.lineWidth = 3; ctx.strokeStyle = '#1B5E20'; ctx.stroke();
+
+        // 绘制内圆
+        ctx.beginPath();
+        ctx.arc(CX, CY, R1, 0, Math.PI*2);
+        ctx.lineWidth = 2; ctx.strokeStyle = '#1B5E20'; ctx.stroke();
+
+        // 绘制8条米字放射线（中心 → 外圆）
         ctx.lineWidth = 2;
-        ctx.strokeStyle = 'var(--line-color)';
-        for(let i=0; i<nodes.length; i++) {
-            for(let j of edges[i]) {
-                if(i < j) { // 避免重复绘制
-                    ctx.beginPath();
-                    // 处理半圆的弧线美化
-                    if(i >= 17 && (j >= 9 && j <= 16)) {
-                        ctx.moveTo(nodes[i].x, nodes[i].y);
-                        // 用二次贝塞尔曲线画出半圆感
-                        let midX = (nodes[i].x + nodes[j].x)/2;
-                        let midY = (nodes[i].y + nodes[j].y)/2;
-                        let offset = 20; // 弧度偏移
-                        if(i===17) midY -= offset;
-                        if(i===18) midX += offset;
-                        if(i===19) midY += offset;
-                        if(i===20) midX -= offset;
-                        ctx.quadraticCurveTo(midX, midY, nodes[j].x, nodes[j].y);
-                    } else {
-                        ctx.moveTo(nodes[i].x, nodes[i].y);
-                        ctx.lineTo(nodes[j].x, nodes[j].y);
-                    }
-                    ctx.stroke();
-                }
-            }
+        for(let i=0; i<8; i++) {
+            ctx.beginPath();
+            ctx.moveTo(CX, CY);
+            ctx.lineTo(CX + R2 * Math.cos(ANGLES[i]), CY + R2 * Math.sin(ANGLES[i]));
+            ctx.stroke();
         }
 
         // 绘制交叉点提示圆
@@ -342,7 +461,7 @@
         });
 
         // 渲染棋子
-        for(let i=0; i<21; i++) {
+        for(let i=0; i<NUM_NODES; i++) {
             if(board[i] !== 0) {
                 let piece = document.createElement('div');
                 piece.className = `piece ${board[i] === P1 ? 'p1' : 'p2'}`;
@@ -453,7 +572,7 @@
         let captured = [];
         let globalVisited = new Set();
         
-        for(let i=0; i<21; i++) {
+        for(let i=0; i<NUM_NODES; i++) {
             if(b[i] === victimColor && !globalVisited.has(i)) {
                 let group = getGroup(b, i, victimColor);
                 group.forEach(n => globalVisited.add(n));
@@ -482,7 +601,7 @@
         let p1c = 0, p2c = 0;
         let p1HasMoves = false, p2HasMoves = false;
         
-        for(let i=0; i<21; i++) {
+        for(let i=0; i<NUM_NODES; i++) {
             if(board[i] === P1) {
                 p1c++;
                 if(!p1HasMoves && edges[i].some(a => board[a]===0 && !isSuicide(board, i, a, P1))) p1HasMoves = true;
@@ -529,7 +648,7 @@
 
         // 获取所有合法步
         let allMoves = [];
-        for(let i=0; i<21; i++) {
+        for(let i=0; i<NUM_NODES; i++) {
             if(board[i] === P2) {
                 edges[i].forEach(adj => {
                     if(board[adj] === 0 && !isSuicide(board, i, adj, P2)) {
@@ -579,14 +698,14 @@
 
     function minimax(b, depth, alpha, beta, isMaximizing) {
         let p1c=0, p2c=0;
-        for(let i=0; i<21; i++) { if(b[i]===P1) p1c++; else if(b[i]===P2) p2c++; }
+        for(let i=0; i<NUM_NODES; i++) { if(b[i]===P1) p1c++; else if(b[i]===P2) p2c++; }
         if(p1c <= 2) return 99999 + depth; // P2 Win
         if(p2c <= 2) return -99999 - depth; // P1 Win
         if(depth === 0) return evaluateBoard(b);
 
         let color = isMaximizing ? P2 : P1;
         let moves = [];
-        for(let i=0; i<21; i++) {
+        for(let i=0; i<NUM_NODES; i++) {
             if(b[i] === color) {
                 edges[i].forEach(adj => {
                     if(b[adj] === 0 && !isSuicide(b, i, adj, color)) moves.push({fr: i, to: adj});
@@ -622,7 +741,7 @@
 
     function evaluateBoard(b) {
         let score = 0;
-        for(let i=0; i<21; i++) {
+        for(let i=0; i<NUM_NODES; i++) {
             if(b[i] === P2) {
                 score += 1000;
                 // 鼓励靠近中心
