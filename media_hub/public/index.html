@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Hub - 多平台自媒体发布工作台</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+        --bg: #0f1117; --panel: #181b24; --panel2: #1f2330; --border: #2a2f3e;
+        --text: #e8eaf0; --muted: #8b91a5; --primary: #7c5cff; --primary2: #4f9dff;
+        --success: #2ecc71; --danger: #ff5c72; --warn: #ffb020;
+        --wx: #07c160; --bj: #2932e1; --tt: #f04142;
+    }
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    a { color: var(--primary2); text-decoration: none; }
+
+    /* 顶栏 */
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px;
+        background: linear-gradient(135deg, rgba(124,92,255,.15), rgba(79,157,255,.1)); border-bottom: 1px solid var(--border);
+        position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px); }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+    .brand .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--primary2));
+        display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .topbar-tabs { display: flex; gap: 4px; background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+    .topbar-tabs button { background: transparent; border: none; color: var(--muted); padding: 8px 18px; border-radius: 8px;
+        cursor: pointer; font-size: 13px; font-weight: 600; transition: .2s; }
+    .topbar-tabs button.on { background: linear-gradient(135deg, var(--primary), var(--primary2)); color: #fff; }
+
+    /* 布局 */
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 15px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .card h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary2)); }
+    .card h2 .count { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+    /* 平台卡片 */
+    .platform-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 700px) { .platform-grid { grid-template-columns: 1fr; } }
+    .platform-card { background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; transition: .2s; }
+    .platform-card.connected { border-color: var(--success); }
+    .platform-card .p-icon { font-size: 28px; margin-bottom: 8px; }
+    .platform-card .p-name { font-size: 14px; font-weight: 600; }
+    .platform-card .p-status { font-size: 11px; margin-top: 6px; padding: 3px 10px; border-radius: 20px; display: inline-block; }
+    .p-status.on { background: rgba(46,204,113,.15); color: var(--success); }
+    .p-status.off { background: rgba(255,92,114,.15); color: var(--danger); }
+    .platform-card .p-btn { margin-top: 10px; width: 100%; padding: 7px; border-radius: 8px; border: 1px solid var(--border);
+        background: var(--panel); color: var(--text); cursor: pointer; font-size: 12px; transition: .2s; }
+    .platform-card .p-btn:hover { border-color: var(--primary); }
+
+    /* 表单 */
+    label.fl { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+    input[type="text"], textarea, select { width: 100%; background: var(--panel2); border: 1px solid var(--border);
+        color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 13px; outline: none; transition: .2s; font-family: inherit; }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 200px; line-height: 1.7; }
+    .title-input { font-size: 17px !important; font-weight: 700; padding: 14px !important; }
+
+    /* 平台选择 */
+    .platform-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+    .platform-check { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--panel2);
+        border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: .2s; }
+    .platform-check.checked { border-color: var(--primary); background: rgba(124,92,255,.12); }
+    .platform-check input { display: none; }
+    .platform-check .ck-label { font-size: 13px; font-weight: 600; }
+
+    /* 按钮 */
+    .btn { padding: 11px 22px; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; transition: .2s; }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary2)); color: #fff; box-shadow: 0 4px 16px rgba(124,92,255,.3); }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(124,92,255,.5); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-ghost { background: var(--panel2); border: 1px solid var(--border); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--primary); }
+    .btn-danger { background: rgba(255,92,114,.15); border: 1px solid rgba(255,92,114,.4); color: var(--danger); }
+    .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+
+    /* 数据看板 */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 700px) { .stats-grid { grid-template-columns: 1fr; } }
+    .stat-card { background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .stat-card .sc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .stat-card .sc-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .stat-card .sc-name { font-size: 14px; font-weight: 600; }
+    .stat-card .sc-status { font-size: 11px; margin-left: auto; padding: 2px 8px; border-radius: 20px; }
+    .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+    .stat-row:first-of-type { border-top: none; }
+    .stat-row .sr-label { color: var(--muted); }
+    .stat-row .sr-value { font-weight: 700; }
+
+    /* 文章列表 */
+    .article-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--panel2);
+        border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; transition: .2s; cursor: pointer; }
+    .article-item:hover { border-color: var(--primary); }
+    .article-item .ai-main { flex: 1; min-width: 0; }
+    .article-item .ai-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .article-item .ai-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .article-item .ai-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; }
+    .badge-draft { background: rgba(139,145,165,.15); color: var(--muted); }
+    .badge-published { background: rgba(46,204,113,.15); color: var(--success); }
+    .badge-scheduled { background: rgba(255,176,32,.15); color: var(--warn); }
+
+    /* 定时任务 */
+    .schedule-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--panel2);
+        border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+    .schedule-item .si-icon { font-size: 20px; }
+    .schedule-item .si-main { flex: 1; }
+    .schedule-item .si-title { font-size: 13px; }
+    .schedule-item .si-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* 上传 */
+    .upload-area { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center;
+        cursor: pointer; transition: .2s; color: var(--muted); font-size: 12px; }
+    .upload-area:hover { border-color: var(--primary); color: var(--primary2); }
+    .cover-preview { max-width: 200px; max-height: 120px; border-radius: 8px; margin-top: 10px; }
+
+    /* 弹窗 */
+    .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100;
+        align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-mask.show { display: flex; }
+    .modal { width: 460px; max-width: calc(100vw - 40px); background: var(--panel); border: 1px solid var(--border);
+        border-radius: 16px; padding: 24px; }
+    .modal h3 { font-size: 16px; margin-bottom: 12px; }
+    .modal .msg { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
+
+    /* Toast */
+    .toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-16px);
+        background: var(--panel2); border: 1px solid var(--border); color: var(--text); padding: 11px 22px;
+        border-radius: 10px; font-size: 13px; z-index: 200; opacity: 0; pointer-events: none; transition: .3s;
+        box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: 90vw; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { border-color: var(--danger); }
+    .toast.ok { border-color: var(--success); }
+
+    /* 发布结果 */
+    .result-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel2);
+        border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+    .result-item.ok { border-color: rgba(46,204,113,.4); }
+    .result-item.fail { border-color: rgba(255,92,114,.4); }
+    .result-item .ri-icon { font-size: 18px; }
+    .result-item .ri-main { flex: 1; }
+    .result-item .ri-name { font-size: 13px; font-weight: 600; }
+    .result-item .ri-msg { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    .hidden { display: none !important; }
+    .spinner { width: 14px; height: 14px; border: 2px solid rgba(124,92,255,.3); border-top-color: var(--primary);
+        border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="brand"><div class="logo">📡</div>Media Hub</div>
+    <div class="topbar-tabs">
+        <button class="on" data-tab="compose">✏️ 写文章</button>
+        <button data-tab="dashboard">📊 数据看板</button>
+        <button data-tab="articles">📁 素材管理</button>
+        <button data-tab="schedules">⏰ 定时发布</button>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ===== 写文章 ===== -->
+    <div id="tab-compose">
+        <!-- 平台连接状态 -->
+        <div class="card">
+            <h2><span class="dot"></span>平台连接</h2>
+            <div class="platform-grid" id="platform-grid"></div>
+        </div>
+
+        <!-- 编辑器 -->
+        <div class="card">
+            <h2><span class="dot"></span>编辑文章</h2>
+
+            <label class="fl">标题</label>
+            <input type="text" id="article-title" class="title-input" placeholder="输入文章标题…">
+
+            <label class="fl">正文内容（支持 HTML）</label>
+            <textarea id="article-content" placeholder="输入文章内容…（可用 HTML 标签排版）"></textarea>
+
+            <label class="fl">封面图</label>
+            <div class="upload-area" onclick="document.getElementById('cover-upload').click()">
+                点击上传封面图（可选）
+                <input type="file" id="cover-upload" accept="image/*" style="display:none" onchange="uploadCover(event)">
+            </div>
+            <img id="cover-preview" class="cover-preview hidden" alt="封面预览">
+
+            <label class="fl">AI 生成封面（仅微信公众号）</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <input type="checkbox" id="ai-cover-enable" style="width:auto" onchange="toggleAiCover()">
+                <span style="font-size:13px;color:var(--muted)">使用微信 AI 配图自动生成封面</span>
+            </div>
+            <input type="text" id="ai-cover-prompt" placeholder="描述你想要的封面画面，如：程序员在电脑前编码，暖色调" style="display:none" disabled>
+
+            <label class="fl">发布到</label>
+            <div class="platform-checks" id="publish-platforms"></div>
+
+            <div class="btn-row">
+                <button class="btn btn-ghost" id="btn-draft" onclick="saveDraft()">💾 存为草稿</button>
+                <button class="btn btn-primary" id="btn-publish" onclick="publishArticle()">🚀 一键发布</button>
+            </div>
+        </div>
+
+        <!-- 发布结果 -->
+        <div class="card hidden" id="result-card">
+            <h2><span class="dot"></span>发布结果</h2>
+            <div id="result-list"></div>
+        </div>
+    </div>
+
+    <!-- ===== 数据看板 ===== -->
+    <div id="tab-dashboard" class="hidden">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <h2 style="margin:0"><span class="dot"></span>平台数据概览</h2>
+                <button class="btn btn-ghost" onclick="loadStats()">🔄 刷新数据</button>
+            </div>
+        </div>
+        <div class="stats-grid" id="stats-grid">
+            <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px">点击刷新获取数据</div>
+        </div>
+    </div>
+
+    <!-- ===== 素材管理 ===== -->
+    <div id="tab-articles" class="hidden">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <h2 style="margin:0"><span class="dot"></span>文章列表 <span class="count" id="art-count"></span></h2>
+                <button class="btn btn-ghost" onclick="loadArticles()">🔄 刷新</button>
+            </div>
+            <div id="article-list" style="margin-top:16px"></div>
+        </div>
+    </div>
+
+    <!-- ===== 定时发布 ===== -->
+    <div id="tab-schedules" class="hidden">
+        <div class="card">
+            <h2><span class="dot"></span>新建定时任务</h2>
+            <div class="grid-2">
+                <div>
+                    <label class="fl">选择文章</label>
+                    <select id="sched-article"></select>
+                </div>
+                <div>
+                    <label class="fl">定时执行时间</label>
+                    <input type="datetime-local" id="sched-time">
+                </div>
+            </div>
+            <label class="fl">发布到</label>
+            <div class="platform-checks" id="sched-platforms"></div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="createSchedule()">⏰ 创建定时任务</button>
+            </div>
+        </div>
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <h2 style="margin:0"><span class="dot"></span>定时任务列表</h2>
+                <button class="btn btn-ghost" onclick="loadSchedules()">🔄 刷新</button>
+            </div>
+            <div id="schedule-list" style="margin-top:16px"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 登录确认弹窗 -->
+<div class="modal-mask" id="login-modal">
+    <div class="modal">
+        <h3 id="login-modal-title">🔐 保存登录态</h3>
+        <div class="msg" id="login-modal-msg">请在弹出的浏览器窗口中完成登录。登录成功后，点击下方按钮保存登录状态。</div>
+        <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost" style="flex:1" onclick="closeLoginModal()">取消</button>
+            <button class="btn btn-primary" style="flex:1" onclick="saveLogin()">✅ 已登录，保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let platformStatus = {};
+let editingArticleId = null;
+let currentCover = '';
+let loginPlatform = '';
+
+// ===== 工具 =====
+const $ = id => document.getElementById(id);
+function toast(msg, type = '') {
+    const t = $('toast'); t.textContent = msg; t.className = 'toast show ' + type;
+    clearTimeout(t._tm); t._tm = setTimeout(() => t.className = 'toast', 3200);
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(ts) { if (!ts) return '-'; const d = new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+// ===== Tab 切换 =====
+document.querySelector('.topbar-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    [...e.currentTarget.children].forEach(b => b.classList.toggle('on', b === btn));
+    const tab = btn.dataset.tab;
+    ['compose','dashboard','articles','schedules'].forEach(t => {
+        $('tab-' + t).classList.toggle('hidden', t !== tab);
+    });
+    if (tab === 'dashboard') loadStats();
+    if (tab === 'articles') loadArticles();
+    if (tab === 'schedules') { loadSchedules(); fillScheduleSelects(); }
+});
+
+// ===== 平台状态 =====
+async function loadStatus() {
+    const resp = await fetch(API + '/api/status');
+    platformStatus = await resp.json();
+    renderPlatforms();
+    renderPublishPlatforms();
+}
+
+function renderPlatforms() {
+    const icons = { weixin: '💚', baijia: '🔵', toutiao: '🔴' };
+    $('platform-grid').innerHTML = Object.entries(platformStatus).map(([key, p]) => `
+        <div class="platform-card ${p.loggedIn ? 'connected' : ''}">
+            <div class="p-icon">${icons[key] || '📱'}</div>
+            <div class="p-name">${esc(p.name)}</div>
+            <div class="p-status ${p.loggedIn ? 'on' : 'off'}">${p.loggedIn ? '✅ 已连接' : '❌ 未登录'}</div>
+            <button class="p-btn" onclick="startLogin('${key}')">${p.loggedIn ? '🔄 重新登录' : '🔐 登录'}</button>
+        </div>
+    `).join('');
+}
+
+function renderPublishPlatforms() {
+    const checks = Object.entries(platformStatus).map(([key, p]) => `
+        <label class="platform-check" data-key="${key}" onclick="toggleCheck(this)">
+            <input type="checkbox" value="${key}">
+            <span class="ck-label">${esc(p.name)}</span>
+        </label>
+    `).join('');
+    $('publish-platforms').innerHTML = checks;
+    $('sched-platforms').innerHTML = checks;
+}
+
+function toggleCheck(el) {
+    const input = el.querySelector('input');
+    input.checked = !input.checked;
+    el.classList.toggle('checked', input.checked);
+}
+
+function getCheckedPlatforms(containerId) {
+    return [...$(containerId).querySelectorAll('input:checked')].map(i => i.value);
+}
+
+// ===== 登录 =====
+async function startLogin(platform) {
+    loginPlatform = platform;
+    $('login-modal-title').textContent = `🔐 登录 ${platformStatus[platform].name}`;
+    $('login-modal-msg').textContent = '正在打开浏览器窗口，请在其中完成登录（扫码/输入账号密码）。登录成功后回到这里点击保存。';
+    $('login-modal').classList.add('show');
+    const resp = await fetch(API + `/api/login/${platform}`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) { toast(data.error, 'err'); closeLoginModal(); }
+}
+
+function closeLoginModal() { $('login-modal').classList.remove('show'); }
+
+async function saveLogin() {
+    if (!loginPlatform) return;
+    const resp = await fetch(API + `/api/login/${loginPlatform}/save`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.error) { toast(data.error, 'err'); return; }
+    toast(data.message, 'ok');
+    closeLoginModal();
+    loadStatus();
+}
+
+// ===== 封面上传 =====
+async function uploadCover(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch(API + '/api/upload', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.error) return toast(data.error, 'err');
+    currentCover = data.url;
+    const img = $('cover-preview');
+    img.src = data.url; img.classList.remove('hidden');
+    toast('✅ 封面上传成功', 'ok');
+}
+
+// ===== 文章 =====
+function toggleAiCover() {
+    const cb = $('ai-cover-enable');
+    const input = $('ai-cover-prompt');
+    input.style.display = cb.checked ? 'block' : 'none';
+    input.disabled = !cb.checked;
+}
+
+function getAiCoverPrompt() {
+    if (!$('ai-cover-enable').checked) return '';
+    return $('ai-cover-prompt').value.trim() || $('article-title').value.trim();
+}
+
+async function saveDraft() {
+    const title = $('article-title').value.trim();
+    if (!title) return toast('⚠️ 请输入标题', 'err');
+    const platforms = getCheckedPlatforms('publish-platforms');
+    const body = {
+        title,
+        content: $('article-content').value,
+        cover: currentCover,
+        aiCoverPrompt: getAiCoverPrompt(),
+        platforms: platforms,
+        status: 'draft',
+    };
+    // 先保存到本地
+    let articleId = editingArticleId;
+    if (articleId) {
+        await fetch(API + `/api/articles/${articleId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    } else {
+        const resp = await fetch(API + '/api/articles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const data = await resp.json();
+        articleId = data.id;
+        editingArticleId = articleId;
+    }
+
+    // 如果勾选了发布平台，同时保存到各平台草稿箱
+    if (platforms.length > 0) {
+        $('btn-draft').disabled = true;
+        $('btn-draft').innerHTML = '<span class="spinner"></span> 保存中…';
+        try {
+            const resp = await fetch(API + '/api/publish', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ articleId, platforms })
+            });
+            const data = await resp.json();
+            $('btn-draft').disabled = false;
+            $('btn-draft').innerHTML = '💾 存为草稿';
+            if (data.error) { toast(data.error, 'err'); return; }
+            renderResults(data.results);
+            const allOk = data.results && Object.values(data.results).every(r => r.success);
+            toast(allOk ? '✅ 已保存到本地和各平台草稿箱' : '⚠ 部分平台保存失败，查看结果', allOk ? 'ok' : 'err');
+        } catch (e) {
+            $('btn-draft').disabled = false;
+            $('btn-draft').innerHTML = '💾 存为草稿';
+            toast('保存到平台失败: ' + e.message, 'err');
+        }
+    } else {
+        toast('✅ 草稿已保存到本地', 'ok');
+    }
+}
+
+async function publishArticle() {
+    const title = $('article-title').value.trim();
+    if (!title) return toast('⚠️ 请输入标题', 'err');
+    const platforms = getCheckedPlatforms('publish-platforms');
+    if (!platforms.length) return toast('⚠️ 请至少选择一个发布平台', 'err');
+
+    // 先保存文章
+    const body = { title, content: $('article-content').value, cover: currentCover, aiCoverPrompt: getAiCoverPrompt(), platforms, status: 'scheduled' };
+    let articleId = editingArticleId;
+    if (articleId) {
+        await fetch(API + `/api/articles/${articleId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    } else {
+        const resp = await fetch(API + '/api/articles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const data = await resp.json(); articleId = data.id; editingArticleId = articleId;
+    }
+
+    $('btn-publish').disabled = true;
+    $('btn-publish').innerHTML = '<span class="spinner"></span> 发布中…';
+
+    const resp = await fetch(API + '/api/publish', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ articleId, platforms })
+    });
+    const data = await resp.json();
+
+    $('btn-publish').disabled = false;
+    $('btn-publish').innerHTML = '🚀 一键发布';
+
+    if (data.error) { toast(data.error, 'err'); return; }
+
+    renderResults(data.results);
+    toast('发布任务已完成', data.results && Object.values(data.results).every(r => r.success) ? 'ok' : 'err');
+}
+
+function renderResults(results) {
+    const icons = { weixin: '💚', baijia: '🔵', toutiao: '🔴' };
+    $('result-card').classList.remove('hidden');
+    $('result-list').innerHTML = Object.entries(results).map(([key, r]) => `
+        <div class="result-item ${r.success ? 'ok' : 'fail'}">
+            <span class="ri-icon">${icons[key] || '📱'}</span>
+            <div class="ri-main">
+                <div class="ri-name">${platformStatus[key]?.name || key}</div>
+                <div class="ri-msg">${esc(r.message || r.error || '')}</div>
+            </div>
+            <span>${r.success ? '✅' : '❌'}</span>
+        </div>
+    `).join('');
+}
+
+// ===== 数据看板 =====
+async function loadStats() {
+    $('stats-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px"><span class="spinner"></span> 正在采集数据…</div>';
+    const resp = await fetch(API + '/api/stats');
+    const data = await resp.json();
+    const icons = { weixin: '💚', baijia: '🔵', toutiao: '🔴' };
+    const bgColors = { weixin: 'rgba(7,193,96,.15)', baijia: 'rgba(41,50,225,.15)', toutiao: 'rgba(240,65,66,.15)' };
+
+    $('stats-grid').innerHTML = Object.entries(data).map(([key, s]) => {
+        if (s.error) return `
+            <div class="stat-card">
+                <div class="sc-head"><div class="sc-icon" style="background:${bgColors[key] || 'rgba(124,92,255,.15)'}">${icons[key]}</div>
+                <div class="sc-name">${esc(s.platform || key)}</div>
+                    <span class="sc-status" style="background:rgba(255,92,114,.15);color:var(--danger)">未连接</span></div>
+                <div style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0">${esc(s.error)}</div>
+            </div>`;
+        return `
+            <div class="stat-card">
+                <div class="sc-head">
+                    <div class="sc-icon" style="background:${bgColors[key] || 'rgba(124,92,255,.15)'}">${icons[key]}</div>
+                    <div class="sc-name">${esc(s.platform || key)}</div>
+                    <span class="sc-status" style="background:rgba(46,204,113,.15);color:var(--success)">已连接</span>
+                </div>
+                <div class="stat-row"><span class="sr-label">粉丝数</span><span class="sr-value">${esc(s.followers || '-')}</span></div>
+                <div class="stat-row"><span class="sr-label">阅读量</span><span class="sr-value">${esc(s.reads || '-')}</span></div>
+                <div class="stat-row"><span class="sr-label">文章数</span><span class="sr-value">${esc(s.articles || '-')}</span></div>
+                <div class="stat-row"><span class="sr-label">点赞数</span><span class="sr-value">${esc(s.likes || '-')}</span></div>
+            </div>`;
+    }).join('');
+}
+
+// ===== 文章列表 =====
+async function loadArticles() {
+    const resp = await fetch(API + '/api/articles');
+    const data = await resp.json();
+    $('art-count').textContent = `（${data.length}）`;
+    if (!data.length) { $('article-list').innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px">暂无文章</div>'; return; }
+    const badges = { draft: ['草稿', 'badge-draft'], published: ['已发布', 'badge-published'], scheduled: ['待发布', 'badge-scheduled'] };
+    $('article-list').innerHTML = data.map(a => {
+        const [label, cls] = badges[a.status] || ['未知', 'badge-draft'];
+        return `<div class="article-item" onclick="editArticle('${a.id}')">
+            <div class="ai-main">
+                <div class="ai-title">${esc(a.title)}</div>
+                <div class="ai-meta">${fmtDate(a.createdAt)}${a.publishedAt ? ' · 发布于 ' + fmtDate(a.publishedAt) : ''}</div>
+            </div>
+            <span class="ai-badge ${cls}">${label}</span>
+            <button class="btn btn-danger" style="padding:6px 12px;font-size:11px" onclick="event.stopPropagation();deleteArticle('${a.id}')">删除</button>
+        </div>`;
+    }).join('');
+}
+
+async function editArticle(id) {
+    const resp = await fetch(API + '/api/articles');
+    const data = await resp.json();
+    const a = data.find(x => x.id === id);
+    if (!a) return;
+    editingArticleId = id;
+    $('article-title').value = a.title;
+    $('article-content').value = a.content || '';
+    currentCover = a.cover || '';
+    const img = $('cover-preview');
+    if (a.cover) { img.src = a.cover; img.classList.remove('hidden'); }
+    else { img.classList.add('hidden'); }
+    // 勾选平台
+    [...$('publish-platforms').querySelectorAll('input')].forEach(i => {
+        i.checked = a.platforms?.includes(i.value);
+        i.closest('.platform-check').classList.toggle('checked', i.checked);
+    });
+    document.querySelector('.topbar-tabs button[data-tab="compose"]').click();
+    toast('已载入文章编辑', 'ok');
+}
+
+async function deleteArticle(id) {
+    if (!confirm('确认删除这篇文章？')) return;
+    await fetch(API + `/api/articles/${id}`, { method: 'DELETE' });
+    toast('已删除', 'ok');
+    loadArticles();
+}
+
+// ===== 定时发布 =====
+function fillScheduleSelects() {
+    fetch(API + '/api/articles').then(r => r.json()).then(data => {
+        $('sched-article').innerHTML = data.map(a => `<option value="${a.id}">${esc(a.title)}</option>`).join('')
+            || '<option value="">请先创建文章</option>';
+    });
+}
+
+async function createSchedule() {
+    const articleId = $('sched-article').value;
+    const runAt = $('sched-time').value;
+    const platforms = getCheckedPlatforms('sched-platforms');
+    if (!articleId) return toast('⚠️ 请选择文章', 'err');
+    if (!runAt) return toast('⚠️ 请选择执行时间', 'err');
+    if (!platforms.length) return toast('⚠️ 请选择发布平台', 'err');
+    const resp = await fetch(API + '/api/schedules', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ articleId, platforms, runAt: new Date(runAt).toISOString() })
+    });
+    const data = await resp.json();
+    if (data.error) return toast(data.error, 'err');
+    toast('✅ 定时任务已创建', 'ok');
+    loadSchedules();
+}
+
+async function loadSchedules() {
+    const resp = await fetch(API + '/api/schedules');
+    const data = await resp.json();
+    if (!data.length) { $('schedule-list').innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px">暂无定时任务</div>'; return; }
+    $('schedule-list').innerHTML = data.map(s => `
+        <div class="schedule-item">
+            <span class="si-icon">${s.executed ? '✅' : '⏰'}</span>
+            <div class="si-main">
+                <div class="si-title">文章 ID: ${esc(s.articleId)}</div>
+                <div class="si-meta">平台: ${(s.platforms||[]).join(', ')} · ${s.executed ? '已执行' : '待执行'}</div>
+            </div>
+            ${!s.executed ? `<button class="btn btn-danger" style="padding:6px 12px;font-size:11px" onclick="deleteSchedule('${s.id}')">取消</button>` : ''}
+        </div>
+    `).join('');
+}
+
+async function deleteSchedule(id) {
+    await fetch(API + `/api/schedules/${id}`, { method: 'DELETE' });
+    toast('已取消', 'ok');
+    loadSchedules();
+}
+
+// ===== 初始化 =====
+loadStatus();
+</script>
+</body>
+</html>

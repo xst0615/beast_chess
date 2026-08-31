@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+# 会话数据含登录凭证，禁止上传
+media_hub/data/sessions/
+# 调试截图与临时产物
+media_hub/data/debug/

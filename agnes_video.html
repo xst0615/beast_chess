@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agnes Video 2.5 Flash - 视频生成工作台</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+        --bg: #0f1117;
+        --panel: #181b24;
+        --panel2: #1f2330;
+        --border: #2a2f3e;
+        --text: #e8eaf0;
+        --muted: #8b91a5;
+        --primary: #7c5cff;
+        --primary2: #4f9dff;
+        --success: #2ecc71;
+        --danger: #ff5c72;
+        --warn: #ffb020;
+    }
+
+    body {
+        font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+    }
+
+    /* ===== 顶部栏 ===== */
+    .topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 28px;
+        background: linear-gradient(135deg, rgba(124,92,255,.18), rgba(79,157,255,.12));
+        border-bottom: 1px solid var(--border);
+        position: sticky; top: 0; z-index: 10;
+        backdrop-filter: blur(10px);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+    .brand .logo {
+        width: 34px; height: 34px; border-radius: 10px;
+        background: linear-gradient(135deg, var(--primary), var(--primary2));
+        display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .brand .sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+    .topbar-right { display: flex; gap: 10px; }
+    .btn-settings {
+        background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+        padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px;
+        transition: .2s;
+    }
+    .btn-settings:hover { border-color: var(--primary); }
+
+    /* ===== 布局 ===== */
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 460px 1fr; gap: 24px; }
+    @media (max-width: 980px) { .container { grid-template-columns: 1fr; } }
+
+    .card {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 14px; padding: 20px; margin-bottom: 20px;
+    }
+    .card h2 { font-size: 15px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .card h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary2)); }
+
+    /* ===== 表单 ===== */
+    label.fl { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+    textarea, input[type="text"], input[type="password"], input[type="number"], select {
+        width: 100%; background: var(--panel2); border: 1px solid var(--border);
+        color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 13px;
+        outline: none; transition: border-color .2s;
+        font-family: inherit;
+    }
+    textarea:focus, input:focus, select:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
+
+    .seg { display: flex; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 3px; }
+    .seg button {
+        flex: 1; background: transparent; border: none; color: var(--muted);
+        padding: 8px 4px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: .2s;
+        white-space: nowrap;
+    }
+    .seg button.on { background: linear-gradient(135deg, var(--primary), var(--primary2)); color: #fff; font-weight: 600; }
+
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+    .hint a { color: var(--primary2); text-decoration: none; }
+
+    .media-list { display: flex; flex-direction: column; gap: 8px; }
+    .media-item { display: flex; gap: 8px; }
+    .media-item input { flex: 1; }
+    .media-item .del {
+        background: var(--panel2); border: 1px solid var(--border); color: var(--danger);
+        width: 38px; border-radius: 8px; cursor: pointer; font-size: 15px; flex-shrink: 0;
+    }
+    .btn-mini {
+        background: transparent; border: 1px dashed var(--border); color: var(--muted);
+        padding: 7px; border-radius: 8px; cursor: pointer; font-size: 12px; width: 100%;
+        transition: .2s;
+    }
+    .btn-mini:hover { border-color: var(--primary); color: var(--primary2); }
+
+    .btn-primary {
+        width: 100%; padding: 13px; border: none; border-radius: 10px; cursor: pointer;
+        background: linear-gradient(135deg, var(--primary), var(--primary2));
+        color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 1px;
+        transition: .25s; margin-top: 20px;
+        box-shadow: 0 6px 20px rgba(124,92,255,.35);
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(124,92,255,.5); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ===== 结果区 ===== */
+    .video-stage {
+        background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+        min-height: 320px; display: flex; align-items: center; justify-content: center;
+        position: relative; overflow: hidden;
+    }
+    .video-stage video { width: 100%; max-height: 480px; display: block; border-radius: 12px; }
+    .stage-empty { color: var(--muted); text-align: center; font-size: 13px; line-height: 2; }
+    .stage-empty .big { font-size: 44px; display: block; margin-bottom: 8px; }
+
+    .status-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    }
+    .st-queued { background: rgba(255,176,32,.15); color: var(--warn); }
+    .st-in_progress { background: rgba(79,157,255,.15); color: var(--primary2); }
+    .st-completed { background: rgba(46,204,113,.15); color: var(--success); }
+    .st-failed { background: rgba(255,92,114,.15); color: var(--danger); }
+    .spinner {
+        width: 12px; height: 12px; border: 2px solid rgba(79,157,255,.3);
+        border-top-color: var(--primary2); border-radius: 50%;
+        animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress-wrap { margin: 14px 0; }
+    .progress-bar { height: 10px; background: var(--panel2); border-radius: 6px; overflow: hidden; }
+    .progress-fill {
+        height: 100%; border-radius: 6px; transition: width .5s;
+        background: linear-gradient(90deg, var(--primary), var(--primary2));
+        background-size: 200% 100%;
+        animation: flow 2s linear infinite;
+    }
+    @keyframes flow { to { background-position: -200% 0; } }
+    .progress-text { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    .kv { display: grid; grid-template-columns: 100px 1fr; gap: 6px 12px; font-size: 12px; margin-top: 14px; }
+    .kv .k { color: var(--muted); }
+    .kv .v { word-break: break-all; }
+    .kv .v.mono { font-family: "SF Mono", Consolas, monospace; }
+
+    .video-actions { display: flex; gap: 10px; margin-top: 14px; }
+    .btn-act {
+        flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+        background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+        text-align: center; text-decoration: none; transition: .2s;
+    }
+    .btn-act:hover { border-color: var(--primary); }
+
+    /* ===== 查询区 ===== */
+    .query-row { display: flex; gap: 10px; }
+    .query-row input { flex: 1; }
+    .query-row button {
+        padding: 10px 22px; border: none; border-radius: 8px; cursor: pointer;
+        background: linear-gradient(135deg, var(--primary), var(--primary2));
+        color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap;
+    }
+
+    /* ===== 历史 ===== */
+    .history-item {
+        display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+        background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+        margin-bottom: 8px; cursor: pointer; transition: .2s;
+    }
+    .history-item:hover { border-color: var(--primary); }
+    .history-item .hi-icon { font-size: 18px; flex-shrink: 0; }
+    .history-item .hi-main { flex: 1; min-width: 0; }
+    .history-item .hi-prompt { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-item .hi-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .history-item .hi-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; }
+    .history-item .hi-del:hover { color: var(--danger); }
+
+    /* ===== 设置弹窗 ===== */
+    .modal-mask {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+        z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+    }
+    .modal-mask.show { display: flex; }
+    .modal {
+        width: 480px; max-width: calc(100vw - 40px); max-height: 86vh; overflow-y: auto;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px;
+    }
+    .modal h3 { font-size: 16px; margin-bottom: 4px; }
+    .modal .modal-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions button { flex: 1; padding: 11px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-ghost { background: var(--panel2); border: 1px solid var(--border); color: var(--text); }
+    .btn-save { background: linear-gradient(135deg, var(--primary), var(--primary2)); border: none; color: #fff; }
+
+    /* ===== Toast ===== */
+    .toast {
+        position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-16px);
+        background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+        padding: 11px 22px; border-radius: 10px; font-size: 13px; z-index: 200;
+        opacity: 0; pointer-events: none; transition: .3s;
+        box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: 90vw;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { border-color: var(--danger); }
+    .toast.ok { border-color: var(--success); }
+
+    .error-box {
+        background: rgba(255,92,114,.1); border: 1px solid rgba(255,92,114,.35);
+        color: #ffb3bf; border-radius: 8px; padding: 12px; font-size: 12px;
+        line-height: 1.7; margin-top: 12px; word-break: break-all;
+    }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="brand">
+        <div class="logo">🎬</div>
+        <div>Agnes Video 工作台<span class="sub">agnes-video-2.5-flash</span></div>
+    </div>
+    <div class="topbar-right">
+        <button class="btn-settings" onclick="openSettings()">⚙️ API 设置</button>
+    </div>
+</div>
+
+<div class="container">
+    <!-- ===== 左：生成表单 ===== -->
+    <div>
+        <div class="card">
+            <h2><span class="dot"></span>生成视频</h2>
+
+            <label class="fl">生成模式</label>
+            <div class="seg" id="mode-seg">
+                <button data-mode="text" class="on">📝 文生视频</button>
+                <button data-mode="keyframe">🖼️ 首尾帧</button>
+                <button data-mode="reference">🎯 图片参考</button>
+            </div>
+
+            <label class="fl">视频描述（Prompt）</label>
+            <textarea id="prompt" placeholder="例：一只橘猫在草地上追蝴蝶，阳光明媚，电影感镜头，慢动作"></textarea>
+
+            <!-- keyframe 模式 -->
+            <div id="keyframe-fields" style="display:none">
+                <label class="fl">首帧图片 URL（first_frame）</label>
+                <input type="text" id="first_frame" placeholder="https://example.com/start.png">
+                <label class="fl">尾帧图片 URL（last_frame）</label>
+                <input type="text" id="last_frame" placeholder="https://example.com/end.png（与首帧至少填一个）">
+                <div class="hint">首帧 / 尾帧至少提供一个，需为公网可访问的 HTTPS 图片地址。</div>
+            </div>
+
+            <!-- reference 模式 -->
+            <div id="reference-fields" style="display:none">
+                <label class="fl">参考图片（最多 5 张）</label>
+                <div class="media-list" id="img-list"></div>
+                <button class="btn-mini" onclick="addImageRow()">＋ 添加参考图片</button>
+                <label class="fl">参考音频（可选）</label>
+                <div class="media-list" id="audio-list"></div>
+                <button class="btn-mini" onclick="addAudioRow()">＋ 添加参考音频</button>
+                <div class="hint">Prompt 中可用 &lt;Picture N&gt; / &lt;Audio N&gt; 指代第 N 张素材（从 1 开始）。</div>
+            </div>
+
+            <div class="row2">
+                <div>
+                    <label class="fl">时长（seconds）</label>
+                    <select id="seconds">
+                        <option value="4">4 秒</option>
+                        <option value="5" selected>5 秒（默认）</option>
+                        <option value="6">6 秒</option>
+                        <option value="8">8 秒</option>
+                        <option value="10">10 秒</option>
+                        <option value="12">12 秒</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="fl">画幅（aspect_ratio）</label>
+                    <select id="aspect_ratio">
+                        <option value="16:9" selected>16:9 · 1280×720</option>
+                        <option value="9:16">9:16 · 720×1280</option>
+                        <option value="1:1">1:1 · 720×720</option>
+                        <option value="4:3">4:3 · 960×720</option>
+                        <option value="3:4">3:4 · 720×960</option>
+                        <option value="21:9">21:9 · 1680×720</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row2">
+                <div>
+                    <label class="fl">随机种子（seed，可选）</label>
+                    <input type="number" id="seed" placeholder="留空随机">
+                </div>
+                <div>
+                    <label class="fl">分辨率（size）</label>
+                    <input type="text" value="720P" disabled title="Flash 版固定 720P">
+                </div>
+            </div>
+
+            <button class="btn-primary" id="btn-create" onclick="createTask()">🚀 生成视频</button>
+        </div>
+
+        <div class="card">
+            <h2><span class="dot"></span>查询任务</h2>
+            <div class="query-row">
+                <input type="text" id="query-id" placeholder="输入 video_id 或 task_id">
+                <button onclick="queryById()">🔍 查询</button>
+            </div>
+            <div class="hint">推荐使用 video_id 查询；创建任务后会自动轮询，也可在此手动查询进度。</div>
+        </div>
+
+        <div class="card">
+            <h2><span class="dot"></span>历史任务 <span id="h-count" style="font-size:12px;color:var(--muted);font-weight:400"></span></h2>
+            <div id="history-list">
+                <div class="stage-empty" style="padding:20px 0">暂无历史任务</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 右：结果展示 ===== -->
+    <div>
+        <div class="card">
+            <h2>
+                <span class="dot"></span>任务结果
+                <span id="status-badge" style="margin-left:auto"></span>
+            </h2>
+
+            <div class="video-stage" id="stage">
+                <div class="stage-empty" id="stage-empty">
+                    <span class="big">🎬</span>
+                    填写描述后点击「生成视频」<br>
+                    或在左侧查询已有任务
+                </div>
+            </div>
+
+            <div class="progress-wrap" id="progress-wrap" style="display:none">
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+                <div class="progress-text">
+                    <span id="progress-label">排队中…</span>
+                    <span id="progress-pct">0%</span>
+                </div>
+            </div>
+
+            <div class="video-actions" id="video-actions" style="display:none">
+                <a class="btn-act" id="btn-download" download target="_blank">⬇️ 下载视频</a>
+                <a class="btn-act" id="btn-copy-url" onclick="copyVideoUrl()">📋 复制链接</a>
+            </div>
+
+            <div class="kv" id="task-info" style="display:none"></div>
+            <div class="error-box" id="error-box" style="display:none"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== 设置弹窗 ===== -->
+<div class="modal-mask" id="settings-mask">
+    <div class="modal">
+        <h3>⚙️ API 设置</h3>
+        <div class="modal-sub">API Key 仅保存在本浏览器 localStorage，不会上传到任何服务器。</div>
+
+        <label class="fl">API 站点</label>
+        <select id="site">
+            <option value="https://api.agnes-ai.cn/v1">中国站 · api.agnes-ai.cn</option>
+            <option value="https://apihub.agnes-ai.com/v1">国际站 · apihub.agnes-ai.com</option>
+        </select>
+        <div class="hint">中国站与国际站密钥不通用，需分别注册获取。</div>
+
+        <label class="fl">API Key</label>
+        <input type="password" id="api-key" placeholder="sk-xxxxxxxxxxxxxxxx">
+        <div class="hint">
+            前往
+            <a href="https://platform.agnes-ai.cn/settings/apiKeys" target="_blank">中国站控制台</a> /
+            <a href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank">国际站控制台</a>
+            创建。当前推广期模型免费。
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-ghost" onclick="closeSettings()">取消</button>
+            <button class="btn-save" onclick="saveSettings()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ================= 配置 =================
+const MODEL = 'agnes-video-2.5-flash';
+const LS_KEY = 'agnes_video_cfg';
+const LS_HISTORY = 'agnes_video_history';
+
+let cfg = { site: 'https://api.agnes-ai.cn/v1', apiKey: '' };
+let history = [];
+
+let currentTask = null;   // { video_id, task_id, prompt, mode, created_at }
+let pollTimer = null;
+
+// ================= 工具 =================
+const $ = id => document.getElementById(id);
+
+function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(t._tm);
+    t._tm = setTimeout(() => t.className = 'toast', 3200);
+}
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function loadState() {
+    try { cfg = { ...cfg, ...JSON.parse(localStorage.getItem(LS_KEY) || '{}') }; } catch (e) {}
+    try { history = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]'); } catch (e) { history = []; }
+    if (cfg.apiKey) $('btn-create').textContent = '🚀 生成视频';
+}
+
+function saveCfg() { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }
+function saveHistory() { localStorage.setItem(LS_HISTORY, JSON.stringify(history.slice(0, 50))); }
+
+// ================= 设置 =================
+function openSettings() {
+    $('site').value = cfg.site;
+    $('api-key').value = cfg.apiKey;
+    $('settings-mask').classList.add('show');
+}
+function closeSettings() { $('settings-mask').classList.remove('show'); }
+function saveSettings() {
+    cfg.site = $('site').value.trim().replace(/\/+$/, '');
+    cfg.apiKey = $('api-key').value.trim();
+    saveCfg();
+    closeSettings();
+    toast('✅ 设置已保存', 'ok');
+}
+
+// ================= 模式切换 =================
+let mode = 'text';
+$('mode-seg').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    mode = btn.dataset.mode;
+    [...$('mode-seg').children].forEach(b => b.classList.toggle('on', b === btn));
+    $('keyframe-fields').style.display = mode === 'keyframe' ? '' : 'none';
+    $('reference-fields').style.display = mode === 'reference' ? '' : 'none';
+});
+
+// reference 模式素材行
+function addMediaRow(listId, ph) {
+    const div = document.createElement('div');
+    div.className = 'media-item';
+    div.innerHTML = `<input type="text" placeholder="${ph}"><button class="del" onclick="this.parentNode.remove()">✕</button>`;
+    $(listId).appendChild(div);
+}
+function addImageRow() {
+    const cnt = $('img-list').children.length;
+    if (cnt >= 5) return toast('⚠️ 最多 5 张参考图片', 'err');
+    addMediaRow('img-list', `https://example.com/pic${cnt + 1}.png`);
+}
+function addAudioRow() { addMediaRow('audio-list', 'https://example.com/audio.mp3'); }
+function collectUrls(listId) {
+    return [...$(listId).children].map(d => d.querySelector('input').value.trim()).filter(Boolean);
+}
+
+// ================= API 调用 =================
+function requireKey() {
+    if (!cfg.apiKey) {
+        openSettings();
+        toast('⚠️ 请先配置 API Key', 'err');
+        return false;
+    }
+    return true;
+}
+
+async function apiFetch(path, options = {}) {
+    const url = cfg.site.replace(/\/+$/, '') + path;
+    const resp = await fetch(url, {
+        ...options,
+        headers: {
+            'Authorization': 'Bearer ' + cfg.apiKey,
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        }
+    });
+    let data = null;
+    const text = await resp.text();
+    try { data = JSON.parse(text); } catch (e) { data = { raw: text }; }
+    if (!resp.ok) {
+        const msg = data?.error?.message || data?.message || data?.raw || ('HTTP ' + resp.status);
+        throw new Error(msg);
+    }
+    return data;
+}
+
+// 从响应中提取视频 URL（不同版本字段位置不同，做兼容）
+function extractVideoUrl(resp) {
+    if (!resp) return '';
+    return resp.url
+        || resp.video_url
+        || resp.remixed_from_video_id
+        || resp.output?.url
+        || resp.metadata?.url
+        || resp.data?.url
+        || resp.data?.[0]?.url
+        || '';
+}
+
+function extractTaskId(resp) {
+    if (!resp) return '';
+    return resp.video_id || resp.id || resp.task_id || resp.data?.id || '';
+}
+
+// ================= 创建任务 =================
+async function createTask() {
+    if (!requireKey()) return;
+
+    const prompt = $('prompt').value.trim();
+    if (!prompt) return toast('⚠️ 请填写视频描述', 'err');
+
+    const body = { model: MODEL, prompt, mode };
+    body.seconds = $('seconds').value;
+    body.aspect_ratio = $('aspect_ratio').value;
+    const seed = $('seed').value.trim();
+    if (seed) body.seed = parseInt(seed, 10);
+
+    if (mode === 'keyframe') {
+        const ff = $('first_frame').value.trim();
+        const lf = $('last_frame').value.trim();
+        if (!ff && !lf) return toast('⚠️ 首尾帧模式至少填写一个帧图片 URL', 'err');
+        if (ff) body.first_frame = ff;
+        if (lf) body.last_frame = lf;
+    } else if (mode === 'reference') {
+        const imgs = collectUrls('img-list');
+        const auds = collectUrls('audio-list');
+        if (!imgs.length && !auds.length) return toast('⚠️ 参考模式至少添加一张图片或一段音频', 'err');
+        if (imgs.length) body.images = imgs;
+        if (auds.length) body.audios = auds;
+    }
+
+    $('btn-create').disabled = true;
+    $('btn-create').textContent = '⏳ 提交中…';
+
+    try {
+        const resp = await apiFetch('/videos', { method: 'POST', body: JSON.stringify(body) });
+        const id = extractTaskId(resp);
+        if (!id) throw new Error('响应中未找到任务 ID：' + JSON.stringify(resp).slice(0, 300));
+
+        currentTask = { video_id: resp.video_id || id, task_id: resp.task_id || id, prompt, mode, created_at: Date.now() };
+        history.unshift({ ...currentTask, status: 'queued', video_url: '' });
+        history = history.slice(0, 50);
+        saveHistory(); renderHistory();
+
+        $('query-id').value = currentTask.video_id;
+        toast('🎉 任务已创建：' + id, 'ok');
+        showTask('queued', 0, currentTask);
+        startPolling();
+    } catch (err) {
+        showError(err.message);
+        toast('❌ 创建失败：' + err.message, 'err');
+    } finally {
+        $('btn-create').disabled = false;
+        $('btn-create').textContent = '🚀 生成视频';
+    }
+}
+
+// ================= 轮询 =================
+function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(pollOnce, 2000);
+    pollOnce();
+}
+function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+async function pollOnce() {
+    if (!currentTask) return stopPolling();
+    try {
+        const resp = await queryTask(currentTask.video_id);
+        handleTaskResp(resp);
+    } catch (err) {
+        // 网络抖动不终止轮询，连续失败则停止
+        currentTask._errs = (currentTask._errs || 0) + 1;
+        if (currentTask._errs >= 5) {
+            stopPolling();
+            showError('轮询失败：' + err.message);
+        }
+    }
+}
+
+async function queryTask(videoId) {
+    // 优先 video_id + model_name（文档推荐，兼容全部模式）
+    try {
+        return await apiFetch('/videos/' + encodeURIComponent(videoId) + '?model_name=' + MODEL);
+    } catch (e1) {
+        // 备选1：纯 video_id 查询
+        try {
+            return await apiFetch('/videos/' + encodeURIComponent(videoId));
+        } catch (e2) {
+            // 备选2：video_id 放 query 参数（部分版本网关格式）
+            try {
+                return await apiFetch('/videos?video_id=' + encodeURIComponent(videoId) + '&model_name=' + MODEL);
+            } catch (e3) {
+                throw e1;
+            }
+        }
+    }
+}
+
+function handleTaskResp(resp) {
+    const status = resp.status || resp.state || '';
+    const progress = (resp.progress != null) ? resp.progress : (status === 'completed' ? 100 : 0);
+    const videoUrl = extractVideoUrl(resp);
+
+    if (currentTask) currentTask._errs = 0;
+    showTask(status, progress, currentTask, resp);
+
+    const h = history.find(h => h.video_id === currentTask?.video_id || h.task_id === currentTask?.task_id);
+    if (h) {
+        h.status = status; h.progress = progress;
+        if (videoUrl) h.video_url = videoUrl;
+        saveHistory(); renderHistory();
+    }
+
+    if (status === 'completed') {
+        stopPolling();
+        if (videoUrl) showVideo(videoUrl);
+        else toast('⚠️ 任务完成但未找到视频 URL，请查看任务详情', 'err');
+        toast('🎬 视频生成完成！', 'ok');
+    } else if (status === 'failed') {
+        stopPolling();
+        showError(resp.error || resp.message || '生成失败（未知原因）');
+    }
+}
+
+// ================= 手动查询 =================
+async function queryById() {
+    if (!requireKey()) return;
+    const id = $('query-id').value.trim();
+    if (!id) return toast('⚠️ 请输入 video_id', 'err');
+
+    // 在历史里找对应任务（优先）
+    currentTask = history.find(h => h.video_id === id || h.task_id === id)
+        || { video_id: id, task_id: id, prompt: '(手动查询)', mode: 'text', created_at: Date.now() };
+
+    toast('🔍 查询中…');
+    try {
+        const resp = await queryTask(id);
+        handleTaskResp(resp);
+        const st = resp.status || '';
+        if (st !== 'completed' && st !== 'failed') startPolling();
+    } catch (err) {
+        showError(err.message);
+        toast('❌ 查询失败：' + err.message, 'err');
+    }
+}
+
+// ================= 结果渲染 =================
+const STATUS_MAP = {
+    queued:       ['⏳', '排队中', 'st-queued'],
+    in_progress:  ['🎬', '生成中', 'st-in_progress'],
+    processing:   ['🎬', '生成中', 'st-in_progress'],
+    completed:    ['✅', '已完成', 'st-completed'],
+    failed:       ['❌', '失败', 'st-failed'],
+};
+
+function showTask(status, progress, task, resp) {
+    const [icon, label, cls] = STATUS_MAP[status] || ['❔', status || '未知', 'st-queued'];
+    const badge = $('status-badge');
+    badge.innerHTML = `<span class="status-badge ${cls}">${status === 'in_progress' || status === 'processing' ? '<span class="spinner"></span>' : icon} ${label}</span>`;
+
+    const pw = $('progress-wrap');
+    if (status === 'completed') {
+        pw.style.display = '';
+        $('progress-fill').style.width = '100%';
+        $('progress-label').textContent = '生成完成';
+        $('progress-pct').textContent = '100%';
+    } else if (status === 'failed') {
+        pw.style.display = 'none';
+    } else {
+        pw.style.display = '';
+        const p = Math.min(99, Math.max(0, progress || 0));
+        $('progress-fill').style.width = p + '%';
+        $('progress-label').textContent = status === 'queued' ? '排队中，请稍候…' : '视频生成中，通常需要 30~120 秒…';
+        $('progress-pct').textContent = (progress || 0) + '%';
+    }
+
+    if (task) {
+        const kv = $('task-info');
+        kv.style.display = '';
+        kv.innerHTML = `
+            <div class="k">video_id</div><div class="v mono">${esc(task.video_id || '-')}</div>
+            <div class="k">模式</div><div class="v">${esc(task.mode || 'text')}</div>
+            <div class="k">描述</div><div class="v">${esc(task.prompt || '-')}</div>
+            ${resp && resp.size ? `<div class="k">分辨率</div><div class="v">${esc(resp.size)}</div>` : ''}
+            ${resp && resp.seconds ? `<div class="k">时长</div><div class="v">${esc(resp.seconds)} 秒</div>` : ''}
+        `;
+    }
+}
+
+function showVideo(url) {
+    const stage = $('stage');
+    stage.innerHTML = `
+        <video controls autoplay loop playsinline src="${esc(url)}"></video>
+        <button onclick="this.previousElementSibling.requestFullscreen && this.previousElementSibling.requestFullscreen()"
+                style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px">⛶ 全屏</button>`;
+    $('video-actions').style.display = '';
+    $('btn-download').href = url;
+    $('btn-download').setAttribute('download', 'agnes-video.mp4');
+}
+
+function copyVideoUrl() {
+    const v = document.querySelector('#stage video');
+    if (!v) return toast('⚠️ 暂无视频', 'err');
+    navigator.clipboard.writeText(v.src)
+        .then(() => toast('📋 视频链接已复制', 'ok'))
+        .catch(() => toast('⚠️ 复制失败，请手动复制', 'err'));
+}
+
+function showError(msg) {
+    const box = $('error-box');
+    box.style.display = '';
+    box.innerHTML = '❌ ' + esc(msg)
+        + '<br><span style="color:var(--muted)">排查建议：检查 API Key 是否正确、站点是否匹配；若为 CORS 跨域错误，请用本地代理访问 API。</span>';
+}
+
+// ================= 历史 =================
+function renderHistory() {
+    const list = $('history-list');
+    $('h-count').textContent = history.length ? `（${history.length}）` : '';
+    if (!history.length) {
+        list.innerHTML = '<div class="stage-empty" style="padding:20px 0">暂无历史任务</div>';
+        return;
+    }
+    list.innerHTML = history.map((h, i) => {
+        const [icon, label] = STATUS_MAP[h.status] || ['❔', h.status || '未知'];
+        const time = new Date(h.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return `<div class="history-item" onclick="loadHistory(${i})" title="点击查询该任务">
+            <span class="hi-icon">${h.status === 'completed' ? '✅' : h.status === 'failed' ? '❌' : '🎬'}</span>
+            <div class="hi-main">
+                <div class="hi-prompt">${esc(h.prompt || '(无描述)')}</div>
+                <div class="hi-meta">${time} · ${esc(label)}${h.mode !== 'text' ? ' · ' + esc(h.mode) : ''}</div>
+            </div>
+            <button class="hi-del" onclick="event.stopPropagation();removeHistory(${i})" title="删除">🗑️</button>
+        </div>`;
+    }).join('');
+}
+
+function loadHistory(i) {
+    const h = history[i];
+    if (!h) return;
+    $('query-id').value = h.video_id || h.task_id;
+    currentTask = h;
+    if (h.status === 'completed' && h.video_url) {
+        showTask('completed', 100, h);
+        showVideo(h.video_url);
+    } else {
+        queryById();
+    }
+}
+
+function removeHistory(i) {
+    history.splice(i, 1);
+    saveHistory(); renderHistory();
+    toast('🗑️ 已删除');
+}
+
+// ================= 初始化 =================
+loadState();
+renderHistory();
+$('settings-mask').addEventListener('click', e => { if (e.target === $('settings-mask')) closeSettings(); });
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSettings();
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') createTask();
+});
+</script>
+</body>
+</html>

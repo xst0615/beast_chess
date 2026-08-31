@@ -1,0 +1,118 @@
+// 完整贴图 E2E：标题→正文(keyboard.type)→AI配图→保存→验证草稿箱
+const { chromium } = require('playwright');
+const path = require('path');
+
+const SESSION = path.join(__dirname, 'data', 'sessions', 'weixin.json');
+const DBG = path.join(__dirname, 'data', 'debug');
+const PROMPT = '水墨画风格的中国山水，云雾缭绕的黄山奇松';
+const TITLE = '贴图完整E2E-' + Date.now().toString().slice(-4);
+const CONTENT = '<p>这是一篇测试贴图发布的文章，AI生成封面图片。</p>';
+
+(async () => {
+    const browser = await chromium.launch({ headless: true });
+    const ctx = await browser.newContext({ storageState: SESSION, locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+
+    await page.goto('https://mp.weixin.qq.com/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(3000);
+    const token = page.url().match(/token=(\d+)/)?.[1];
+    console.log('✓ token:', token);
+
+    await page.goto(`https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit_v2&action=edit&isNew=1&type=10&createType=8&token=${token}&lang=zh_CN`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(6000);
+    await page.evaluate(() => document.querySelectorAll('.weui-desktop-dialog__wrp').forEach(w => w.remove()));
+    console.log('✓ 贴图编辑器已打开');
+
+    // 填标题
+    await page.locator('.ProseMirror').first().click();
+    await page.keyboard.type(TITLE);
+    await page.waitForTimeout(500);
+
+    // 填正文（用 keyboard.type，从 HTML 提取纯文本）
+    const plainText = CONTENT.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    await page.locator('.ProseMirror').nth(1).click();
+    await page.waitForTimeout(300);
+    await page.keyboard.type(plainText);
+    await page.waitForTimeout(1000);
+    console.log('✓ 标题和正文已填');
+
+    // AI 配图
+    console.log('\n=== AI 配图 ===');
+    await page.evaluate(() => document.querySelector('.js_img_from_ai')?.click());
+    await page.waitForTimeout(3000);
+    const initImgs = await page.evaluate(() => document.querySelector('.weui-desktop-dialog__wrp')?.querySelectorAll('img').length || 0);
+
+    const ta = page.locator('.chat_textarea').first();
+    await ta.click();
+    await ta.fill(PROMPT);
+    await page.waitForTimeout(500);
+    await page.locator('.weui-desktop-dialog__wrp .send-btn').first().click({ timeout: 5000 });
+    console.log('已发送生成请求...');
+
+    let generated = false;
+    for (let i = 0; i < 18; i++) {
+        await page.waitForTimeout(5000);
+        const s = await page.evaluate(() => {
+            const wrp = document.querySelector('.weui-desktop-dialog__wrp');
+            if (!wrp) return { imgs: 0, gen: true };
+            const imgs = wrp.querySelectorAll('img').length;
+            const t = wrp.textContent || '';
+            return { imgs, gen: t.includes('生成中') || !!wrp.querySelector('[class*="loading"]') };
+        });
+        if ((i + 1) % 4 === 0) console.log(`等待 ${(i + 1) * 5}s: 图片=${s.imgs}`);
+        if (s.imgs > initImgs && !s.gen) { generated = true; break; }
+    }
+    if (!generated) { console.log('❌ 生成超时'); await browser.close(); return; }
+    console.log('✓ AI 图片已生成');
+
+    await page.evaluate(() => {
+        const wrp = document.querySelector('.weui-desktop-dialog__wrp');
+        const btns = [...wrp.querySelectorAll('.ai-image-op-btn')].filter(el => el.textContent?.trim() === '应用' || el.textContent?.trim() === '使用');
+        if (btns.length > 0) btns[btns.length - 1].click();
+    });
+    await page.waitForTimeout(4000);
+    const cnt = await page.evaluate(() => document.querySelectorAll('.ProseMirror img, #js_content img').length);
+    console.log(`✓ 正文图片数: ${cnt}`);
+
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => document.querySelectorAll('.weui-desktop-dialog__wrp').forEach(w => w.remove()));
+    await page.waitForTimeout(800);
+
+    // 保存
+    console.log('\n=== 保存 ===');
+    let saveOk = false;
+    page.on('response', async res => {
+        const url = res.url();
+        if (url.includes('operate_appmsg') && res.request().method() === 'POST' && !url.includes('pre_load')) {
+            try {
+                const body = await res.text();
+                const parsed = JSON.parse(body);
+                if (parsed.base_resp?.ret === 0 && parsed.appMsgId) {
+                    saveOk = true;
+                    console.log('✓ 保存API成功, appMsgId:', parsed.appMsgId);
+                }
+            } catch (e) {}
+        }
+    });
+
+    await page.locator('text=保存为草稿').first().click({ timeout: 10000 });
+    await page.waitForTimeout(5000);
+    await page.locator('button:has-text("确定"), button:has-text("知道了")').first().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    const errors = await page.evaluate(() => [...document.querySelectorAll('.js_error_msg')].filter(el => el.getBoundingClientRect().width > 50).map(el => el.textContent?.trim().slice(0, 80)));
+    if (errors.length) console.log('⚠ 错误:', errors);
+    await page.screenshot({ path: path.join(DBG, 'tietu_full_saved.png') });
+
+    // 验证草稿箱
+    console.log('\n=== 验证草稿箱 ===');
+    await page.goto(`https://mp.weixin.qq.com/cgi-bin/appmsg?begin=0&count=10&type=77&action=list_card&token=${token}&lang=zh_CN`, { waitUntil: 'networkidle' }).catch(() => {});
+    await page.waitForTimeout(4000);
+    const found = (await page.evaluate(() => document.body?.innerText || '')).includes(TITLE);
+    console.log(found ? `✓✓ 草稿箱找到"${TITLE}"` : `✗ 草稿箱未找到"${TITLE}"`);
+    await page.screenshot({ path: path.join(DBG, 'tietu_full_draftbox.png') });
+
+    await browser.close();
+    console.log('\n=== 完成 ===');
+})();
