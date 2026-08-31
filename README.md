@@ -30,7 +30,17 @@
 
 ## 部署方法
 
-### 棋类游戏（静态文件）
+### 在线访问（GitHub Pages）
+
+本仓库已启用 GitHub Pages，无需本地部署即可直接访问：
+
+- 游戏主页：https://xst0615.github.io/beast_chess/
+- Agnes Video 工作台：https://xst0615.github.io/beast_chess/agnes_video.html
+- 其余页面：将文件名追加到 https://xst0615.github.io/beast_chess/ 后即可
+
+推送到 main 分支后，GitHub Pages 会自动更新（通常 1-2 分钟内生效）。
+
+### 棋类游戏（静态文件，本地运行）
 
 无需构建，任选一种方式启动静态服务器：
 
