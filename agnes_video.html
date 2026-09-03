@@ -64,7 +64,13 @@
     .card h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary2)); }
 
     /* ===== 表单 ===== */
-    label.fl { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+    label.fl { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+    label.fl .copy-btn {
+        background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+        padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;
+        transition: .2s;
+    }
+    label.fl .copy-btn:hover { border-color: var(--primary); color: var(--primary2); }
     textarea, input[type="text"], input[type="password"], input[type="number"], select {
         width: 100%; background: var(--panel2); border: 1px solid var(--border);
         color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 13px;
@@ -151,6 +157,14 @@
     .kv .k { color: var(--muted); }
     .kv .v { word-break: break-all; }
     .kv .v.mono { font-family: "SF Mono", Consolas, monospace; }
+    .kv .v.with-copy { display: flex; align-items: flex-start; gap: 8px; }
+    .kv .v.with-copy .v-text { flex: 1; word-break: break-all; }
+    .kv-copy {
+        background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+        padding: 3px 8px; border-radius: 6px; cursor: pointer; font-size: 11px;
+        flex-shrink: 0; transition: .2s;
+    }
+    .kv-copy:hover { border-color: var(--primary); color: var(--primary2); }
 
     .video-actions { display: flex; gap: 10px; margin-top: 14px; }
     .btn-act {
@@ -182,6 +196,15 @@
     .history-item .hi-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
     .history-item .hi-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; }
     .history-item .hi-del:hover { color: var(--danger); }
+
+    /* ===== 历史工具条 ===== */
+    .history-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .history-toolbar .btn-tool {
+        flex: 1; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 12px;
+        background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+        text-align: center; transition: .2s;
+    }
+    .history-toolbar .btn-tool:hover { border-color: var(--primary); color: var(--primary2); }
 
     /* ===== 设置弹窗 ===== */
     .modal-mask {
@@ -244,7 +267,7 @@
                 <button data-mode="reference">🎯 图片参考</button>
             </div>
 
-            <label class="fl">视频描述（Prompt）</label>
+            <label class="fl">视频描述（Prompt）<button type="button" class="copy-btn" onclick="copyPrompt()">📋 复制描述</button></label>
             <textarea id="prompt" placeholder="例：一只橘猫在草地上追蝴蝶，阳光明媚，电影感镜头，慢动作"></textarea>
 
             <!-- keyframe 模式 -->
@@ -272,10 +295,10 @@
                     <label class="fl">时长（seconds）</label>
                     <select id="seconds">
                         <option value="4">4 秒</option>
-                        <option value="5" selected>5 秒（默认）</option>
+                        <option value="5">5 秒</option>
                         <option value="6">6 秒</option>
                         <option value="8">8 秒</option>
-                        <option value="10">10 秒</option>
+                        <option value="10" selected>10 秒（默认）</option>
                         <option value="12">12 秒</option>
                     </select>
                 </div>
@@ -317,6 +340,11 @@
 
         <div class="card">
             <h2><span class="dot"></span>历史任务 <span id="h-count" style="font-size:12px;color:var(--muted);font-weight:400"></span></h2>
+            <div class="history-toolbar">
+                <button class="btn-tool" onclick="exportHistory()">⬇️ 导出历史</button>
+                <button class="btn-tool" onclick="$('import-file').click()">⬆️ 导入历史</button>
+                <input type="file" id="import-file" accept="application/json,.json" style="display:none" onchange="importHistory(event)">
+            </div>
             <div id="history-list">
                 <div class="stage-empty" style="padding:20px 0">暂无历史任务</div>
             </div>
@@ -635,7 +663,9 @@ function handleTaskResp(resp) {
         toast('🎬 视频生成完成！', 'ok');
     } else if (status === 'failed') {
         stopPolling();
-        showError(resp.error || resp.message || '生成失败（未知原因）');
+        const failMsg = resp.error || resp.message || '生成失败（未知原因）';
+        if (h) { h.error = failMsg; saveHistory(); }
+        showError(failMsg);
     }
 }
 
@@ -697,11 +727,22 @@ function showTask(status, progress, task, resp) {
         kv.innerHTML = `
             <div class="k">video_id</div><div class="v mono">${esc(task.video_id || '-')}</div>
             <div class="k">模式</div><div class="v">${esc(task.mode || 'text')}</div>
-            <div class="k">描述</div><div class="v">${esc(task.prompt || '-')}</div>
+            <div class="k">描述</div><div class="v with-copy"><span class="v-text">${esc(task.prompt || '-')}</span><button type="button" class="kv-copy" onclick="copyResultPrompt(this)" title="复制描述">📋 复制</button></div>
             ${resp && resp.size ? `<div class="k">分辨率</div><div class="v">${esc(resp.size)}</div>` : ''}
             ${resp && resp.seconds ? `<div class="k">时长</div><div class="v">${esc(resp.seconds)} 秒</div>` : ''}
         `;
     }
+}
+
+function resetStage(msg) {
+    stopPolling();
+    const stage = $('stage');
+    stage.innerHTML = `<div class="stage-empty"><span class="big">🎬</span>${msg || '填写描述后点击「生成视频」<br>或在左侧查询已有任务'}</div>`;
+    $('video-actions').style.display = 'none';
+    $('progress-wrap').style.display = 'none';
+    $('task-info').style.display = 'none';
+    $('error-box').style.display = 'none';
+    $('status-badge').innerHTML = '';
 }
 
 function showVideo(url) {
@@ -720,6 +761,23 @@ function copyVideoUrl() {
     if (!v) return toast('⚠️ 暂无视频', 'err');
     navigator.clipboard.writeText(v.src)
         .then(() => toast('📋 视频链接已复制', 'ok'))
+        .catch(() => toast('⚠️ 复制失败，请手动复制', 'err'));
+}
+
+function copyPrompt() {
+    const text = $('prompt').value.trim();
+    if (!text) return toast('⚠️ 描述为空，无内容可复制', 'err');
+    navigator.clipboard.writeText(text)
+        .then(() => toast('📋 描述已复制', 'ok'))
+        .catch(() => toast('⚠️ 复制失败，请手动复制', 'err'));
+}
+
+function copyResultPrompt(btn) {
+    const span = btn.previousElementSibling;
+    const text = span ? span.textContent.trim() : '';
+    if (!text || text === '-') return toast('⚠️ 暂无描述', 'err');
+    navigator.clipboard.writeText(text)
+        .then(() => toast('📋 描述已复制', 'ok'))
         .catch(() => toast('⚠️ 复制失败，请手动复制', 'err'));
 }
 
@@ -757,10 +815,20 @@ function loadHistory(i) {
     if (!h) return;
     $('query-id').value = h.video_id || h.task_id;
     currentTask = h;
+
     if (h.status === 'completed' && h.video_url) {
+        // 已完成：直接展示历史视频
         showTask('completed', 100, h);
         showVideo(h.video_url);
+    } else if (h.status === 'failed') {
+        // 失败：清空舞台并展示失败信息
+        resetStage('该任务生成失败');
+        showTask('failed', 0, h);
+        showError(h.error || '生成失败（未知原因）');
     } else {
+        // 未完成（排队中/生成中/无状态）：先清空舞台，再查询最新进度
+        resetStage('任务尚未完成，正在查询最新进度…');
+        showTask(h.status || 'queued', h.progress || 0, h);
         queryById();
     }
 }
@@ -769,6 +837,63 @@ function removeHistory(i) {
     history.splice(i, 1);
     saveHistory(); renderHistory();
     toast('🗑️ 已删除');
+}
+
+// ================= 历史导入导出 =================
+function exportHistory() {
+    if (!history.length) return toast('⚠️ 暂无历史可导出', 'err');
+    const payload = {
+        _type: 'agnes_video_history',
+        _version: 1,
+        _exported_at: new Date().toISOString(),
+        _count: history.length,
+        items: history
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    a.href = url;
+    a.download = `agnes-video-history-${ts}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`✅ 已导出 ${history.length} 条历史`, 'ok');
+}
+
+function importHistory(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = ''; // 允许重复导入同一文件
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const data = JSON.parse(reader.result);
+            const items = Array.isArray(data) ? data : data.items;
+            if (!Array.isArray(items)) throw new Error('文件格式不正确：找不到 items 数组');
+            // 基本字段校验，丢弃无效项
+            const valid = items.filter(it => it && (it.video_id || it.task_id));
+            if (!valid.length) throw new Error('文件中没有有效任务（缺少 video_id/task_id）');
+
+            // 按 video_id/task_id 去重，新导入的覆盖旧记录（取较新 created_at）
+            const map = new Map();
+            const merge = arr => arr.forEach(it => {
+                const key = it.video_id || it.task_id;
+                const prev = map.get(key);
+                if (!prev || (it.created_at || 0) >= (prev.created_at || 0)) map.set(key, it);
+            });
+            merge(history);
+            merge(valid);
+            history = [...map.values()].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 50);
+            saveHistory(); renderHistory();
+            toast(`✅ 已导入 ${valid.length} 条，当前共 ${history.length} 条`, 'ok');
+        } catch (err) {
+            toast('❌ 导入失败：' + err.message, 'err');
+        }
+    };
+    reader.onerror = () => toast('❌ 读取文件失败', 'err');
+    reader.readAsText(file);
 }
 
 // ================= 初始化 =================
