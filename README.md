@@ -16,6 +16,7 @@
 | `chinese_checkers.html` | 中国跳棋 |
 | `military_chess.html` | 二人军棋 |
 | `nine_rings.html` | 九连环 |
+| `focus_training.html` | 专注力训练（舒尔特方格 / 翻牌配对 / 反应速度 / Stroop 字色干扰 四合一，难度递进） |
 
 ### 工具与内容页
 
@@ -88,6 +89,7 @@ npm start
 ├── chinese_checkers.html   # 中国跳棋
 ├── military_chess.html     # 二人军棋
 ├── nine_rings.html         # 九连环
+├── focus_training.html     # 专注力训练（四合一）
 ├── agnes_video.html        # 视频生成工作台
 ├── article_shuixiang.html  # 文章页
 ├── media_hub/              # 自媒体发布工具

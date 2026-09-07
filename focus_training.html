@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>专注力训练馆</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #e3f2fd 0%, #fce4ec 100%);
+        min-height: 100vh;
+        display: flex; flex-direction: column; align-items: center;
+        padding: 15px;
+    }
+    h1 {
+        color: #5c6dc7; font-size: 28px; margin-bottom: 14px;
+        letter-spacing: 3px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* ===== 模式选择 ===== */
+    .mode-grid {
+        display: grid; grid-template-columns: repeat(4, 1fr);
+        gap: 12px; max-width: 720px; width: 100%; margin-bottom: 16px;
+    }
+    @media (max-width: 600px) { .mode-grid { grid-template-columns: repeat(2, 1fr); } }
+    .mode-card {
+        background: #fff; border: 3px solid transparent; border-radius: 14px;
+        padding: 16px 8px; text-align: center; cursor: pointer;
+        box-shadow: 0 4px 12px rgba(92,109,199,0.12);
+        transition: all 0.2s; font-family: inherit;
+    }
+    .mode-card:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(92,109,199,0.2); }
+    .mode-card.on { border-color: #5c6dc7; background: #eef2ff; }
+    .mode-card .mc-icon { font-size: 32px; margin-bottom: 6px; }
+    .mode-card .mc-name { font-size: 15px; font-weight: bold; color: #5c6dc7; }
+    .mode-card .mc-best { font-size: 11px; color: #888; margin-top: 4px; }
+
+    /* ===== 状态栏 ===== */
+    .status-bar {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+        background: #fff; padding: 8px 12px; border-radius: 12px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.08); width: 100%; max-width: 560px;
+        font-size: 14px; margin-bottom: 12px;
+    }
+    .status-bar .info { font-weight: bold; color: #5c6dc7; }
+    .status-bar .divider { color: #ccc; margin: 0 4px; }
+    .status-bar select, .status-bar button {
+        padding: 6px 10px; border: none; border-radius: 8px;
+        background: #5c6dc7; color: #fff; font-weight: bold;
+        cursor: pointer; font-size: 13px; font-family: inherit;
+        transition: background 0.2s, transform 0.1s;
+    }
+    .status-bar select { background: #f5f5f5; color: #5c6dc7; border: 2px solid #ddd; }
+    .status-bar button:hover { background: #4a59b0; transform: translateY(-1px); }
+    .status-bar .btn-back { background: #aaa; }
+    .status-bar .btn-back:hover { background: #888; }
+
+    /* ===== 游戏舞台 ===== */
+    .stage {
+        background: #fff; border-radius: 16px; border: 3px solid #c5cae9;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.08); padding: 20px;
+        width: 100%; max-width: 560px; min-height: 360px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        position: relative; overflow: hidden;
+    }
+
+    /* 舒尔特方格 */
+    .schulte-grid {
+        display: grid; gap: 6px; width: 100%; max-width: 420px; aspect-ratio: 1;
+    }
+    .schulte-cell {
+        background: #f5f5f5; border: 2px solid #e0e0e0; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px; font-weight: bold; color: #5c6dc7;
+        cursor: pointer; transition: all 0.15s; user-select: none;
+    }
+    .schulte-cell:hover { background: #e8eaf6; border-color: #5c6dc7; }
+    .schulte-cell.done { background: #c8e6c9; border-color: #4caf50; color: #2e7d32; cursor: default; }
+    .schulte-cell.err { animation: shake 0.4s; background: #ffcdd2; border-color: #e53935; color: #c62828; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+    /* 翻牌 */
+    .memory-grid {
+        display: grid; gap: 8px; width: 100%; max-width: 440px;
+    }
+    .mem-card {
+        aspect-ratio: 1; perspective: 600px; cursor: pointer;
+    }
+    .mem-inner {
+        position: relative; width: 100%; height: 100%; transition: transform 0.5s;
+        transform-style: preserve-3d;
+    }
+    .mem-card.flipped .mem-inner { transform: rotateY(180deg); }
+    .mem-face {
+        position: absolute; inset: 0; backface-visibility: hidden;
+        border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        font-size: 32px; border: 2px solid #c5cae9;
+    }
+    .mem-back { background: linear-gradient(135deg, #5c6dc7, #7986cb); color: #fff; font-size: 24px; }
+    .mem-front { background: #fff; transform: rotateY(180deg); }
+    .mem-card.matched .mem-front { background: #c8e6c9; border-color: #4caf50; }
+
+    /* 反应游戏 */
+    .reaction-area {
+        width: 100%; max-width: 440px; aspect-ratio: 1; border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px; font-weight: bold; color: #fff;
+        cursor: pointer; transition: background 0.15s; user-select: none;
+        background: #90a4ae;
+    }
+    .reaction-area.wait { background: #c62828; }
+    .reaction-area.go { background: #43a047; }
+    .reaction-area.toofast { background: #ff6f00; }
+
+    /* Stroop */
+    .stroop-word {
+        font-size: 56px; font-weight: bold; margin: 20px 0 28px;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.15);
+    }
+    .stroop-choices {
+        display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+    }
+    .stroop-btn {
+        width: 64px; height: 64px; border-radius: 12px; border: 3px solid #fff;
+        cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+        transition: transform 0.15s;
+    }
+    .stroop-btn:hover { transform: scale(1.08); }
+    .stroop-btn.correct { animation: pop 0.3s; outline: 3px solid #2e7d32; }
+    .stroop-btn.wrong { animation: shake 0.4s; outline: 3px solid #c62828; }
+
+    /* 进度条 */
+    .progress-wrap { width: 100%; max-width: 420px; margin-bottom: 12px; }
+    .progress-bar { height: 8px; background: #e0e0e0; border-radius: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #5c6dc7, #7986cb); border-radius: 6px; transition: width 0.3s; }
+
+    /* 规则面板 */
+    .rules-panel {
+        width: 100%; max-width: 560px; margin-top: 14px;
+    }
+    .rules-panel details {
+        background: #fff; border: 2px solid #c5cae9; border-radius: 14px; overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .rules-panel summary {
+        list-style: none; cursor: pointer; padding: 12px 16px;
+        background: linear-gradient(135deg, #5c6dc7, #7986cb); color: #fff;
+        font-weight: bold; font-size: 16px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .rules-panel summary::-webkit-details-marker { display: none; }
+    .rules-panel summary .arrow { transition: transform 0.3s; font-size: 12px; opacity: 0.8; }
+    .rules-panel details[open] summary .arrow { transform: rotate(180deg); }
+    .panel-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rule-item {
+        display: flex; gap: 10px; align-items: flex-start; background: #f5f5fa;
+        border: 1px solid #e8eaf6; border-radius: 10px; padding: 9px 10px;
+        font-size: 14px; line-height: 1.5; color: #455a64;
+    }
+    .rule-icon { font-size: 22px; background: #e8eaf6; border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rule-item b { color: #5c6dc7; }
+
+    /* 胜利弹窗 */
+    .win-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .win-modal.show { display: flex; }
+    .win-card { background: #fff; padding: 30px 40px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: pop 0.4s ease; max-width: 90vw; }
+    @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .win-card h2 { font-size: 26px; color: #5c6dc7; margin-bottom: 10px; }
+    .win-card p { color: #455a64; font-size: 15px; margin-bottom: 8px; }
+    .win-card .record { color: #ff6f00; font-weight: bold; font-size: 17px; margin: 8px 0; }
+    .win-card button { padding: 10px 24px; border: none; border-radius: 10px; background: #5c6dc7; color: #fff; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .win-card button:hover { background: #4a59b0; }
+
+    /* Toast */
+    .toast {
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+        background: #5c6dc7; color: #fff; padding: 10px 20px; border-radius: 10px;
+        font-size: 14px; z-index: 200; opacity: 0; pointer-events: none; transition: all 0.3s;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { background: #e53935; }
+    .toast.ok { background: #43a047; }
+</style>
+</head>
+<body>
+<h1>🧠 专注力训练馆 🧠</h1>
+
+<div class="mode-grid" id="mode-grid">
+    <button class="mode-card on" data-mode="schulte">
+        <div class="mc-icon">🎯</div><div class="mc-name">找数字</div><div class="mc-best" id="best-schulte">—</div>
+    </button>
+    <button class="mode-card" data-mode="memory">
+        <div class="mc-icon">🃏</div><div class="mc-name">翻牌配对</div><div class="mc-best" id="best-memory">—</div>
+    </button>
+    <button class="mode-card" data-mode="reaction">
+        <div class="mc-icon">⚡</div><div class="mc-name">反应点点点</div><div class="mc-best" id="best-reaction">—</div>
+    </button>
+    <button class="mode-card" data-mode="stroop">
+        <div class="mc-icon">🎨</div><div class="mc-name">字色干扰</div><div class="mc-best" id="best-stroop">—</div>
+    </button>
+</div>
+
+<div class="status-bar" id="status-bar"></div>
+
+<div class="stage" id="stage"></div>
+
+<div class="rules-panel">
+    <details open>
+        <summary><span id="rules-title">📖 找数字怎么玩</span><span class="arrow">▼</span></summary>
+        <div class="panel-body" id="rules-body"></div>
+    </details>
+</div>
+
+<div class="win-modal" id="win-modal">
+    <div class="win-card">
+        <h2 id="win-title">🎉 完成！</h2>
+        <p id="win-time"></p>
+        <p id="win-extra"></p>
+        <div class="record" id="win-record" style="display:none">🏆 破纪录啦！</div>
+        <button onclick="restartCurrent()">🔄 再玩一次</button>
+        <button onclick="closeWin()" style="background:#aaa">✕ 关闭</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ================= 配置 =================
+const LS_KEY = 'focus_training_best';
+
+const MODES = {
+    schulte:  { name: '找数字', icon: '🎯', diffs: [3, 4, 5, 6], diffLabel: n => `${n}×${n}` },
+    memory:   { name: '翻牌配对', icon: '🃏', diffs: [4, 6, 8, 10], diffLabel: n => `${n}对` },
+    reaction: { name: '反应点点点', icon: '⚡', diffs: ['slow', 'med', 'fast', 'rand'], diffLabel: n => ({slow:'慢',med:'中',fast:'快',rand:'随机'}[n]) },
+    stroop:   { name: '字色干扰', icon: '🎨', diffs: [2, 3, 4, 5], diffLabel: n => `${n}色` },
+};
+
+const RULES = {
+    schulte: [
+        { i: '🎯', t: '<b>怎么玩：</b>方格里乱序排着数字，从 1 开始按顺序点到最大！' },
+        { i: '👆', t: '<b>点对：</b>变绿色，继续点下一个！' },
+        { i: '❌', t: '<b>点错：</b>闪红色抖一下，要重来当前数字哦！' },
+        { i: '⏱', t: '<b>越快越好：</b>从点第一个开始计时，点完最后一个停表！' },
+    ],
+    memory: [
+        { i: '🃏', t: '<b>怎么玩：</b>翻开两张卡片，图案一样就配对成功！' },
+        { i: '🤔', t: '<b>没配对：</b>会翻回去，记住刚才的位置哦！' },
+        { i: '✅', t: '<b>配对成功：</b>卡片变绿色保持翻开！' },
+        { i: '⏱', t: '<b>越快越好：</b>翻第一张开始计时，全部配对完成停表！' },
+    ],
+    reaction: [
+        { i: '🔴', t: '<b>红色等待：</b>屏幕红色时不要点，等它变绿！' },
+        { i: '🟢', t: '<b>绿色快点：</b>屏幕变绿后立刻点！' },
+        { i: '⚡', t: '<b>抢跑：</b>红色时点了要重来本轮！' },
+        { i: '📊', t: '<b>共5轮：</b>取平均反应时间，越短越棒！' },
+    ],
+    stroop: [
+        { i: '🎨', t: '<b>看颜色：</b>屏幕显示一个颜色的字（如"红"字），但字的颜色和字义不同！' },
+        { i: '👆', t: '<b>点颜色：</b>要点的是字的<b>颜色</b>，不是字的意思哦！' },
+        { i: '✅', t: '<b>点对：</b>绿色边框，下一题！' },
+        { i: '❌', t: '<b>点错：</b>红色抖动，继续点！' },
+        { i: '📊', t: '<b>共10题：</b>统计正确率和用时！' },
+    ],
+};
+
+const EMOJIS = ['🍎','🍌','🍇','🍓','🍑','🍉','🥝','🍍','🥕','🌽','🍩','🍪','⚽','🏀','🎈','🚗','🚀','🐶','🐱','🐰'];
+const STROOP_COLORS = [
+    { name: '红', color: '#e53935' },
+    { name: '黄', color: '#fdd835' },
+    { name: '蓝', color: '#1e88e5' },
+    { name: '绿', color: '#43a047' },
+    { name: '紫', color: '#8e24aa' },
+];
+
+// ================= 状态 =================
+let best = {};
+let currentMode = 'schulte';
+let currentDiff = 5;
+let game = null;  // 当前游戏状态对象
+let timerStart = 0;
+let timerInterval = null;
+
+// ================= 工具 =================
+const $ = id => document.getElementById(id);
+
+function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(t._tm);
+    t._tm = setTimeout(() => t.className = 'toast', 2200);
+}
+
+function fmtTime(ms) {
+    if (ms < 10000) return (ms / 1000).toFixed(2) + ' 秒';
+    return (ms / 1000).toFixed(1) + ' 秒';
+}
+
+function loadBest() {
+    try { best = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { best = {}; }
+}
+function saveBest() { localStorage.setItem(LS_KEY, JSON.stringify(best)); }
+function bestKey(mode, diff) { return mode + '_' + diff; }
+function isBetter(mode, diff, ms) {
+    const k = bestKey(mode, diff);
+    if (mode === 'stroop') {
+        // Stroop：用 (错误数 * 3000 + 用时) 作为综合分，越低越好
+        return !best[k] || ms < best[k];
+    }
+    return !best[k] || ms < best[k];
+}
+
+function renderBest() {
+    ['schulte', 'memory', 'reaction', 'stroop'].forEach(m => {
+        const mode = MODES[m];
+        let bestMs = Infinity, bestDiff = null;
+        mode.diffs.forEach(d => {
+            const v = best[bestKey(m, d)];
+            if (v != null && v < bestMs) { bestMs = v; bestDiff = d; }
+        });
+        const el = $('best-' + m);
+        if (bestDiff == null) { el.textContent = '—'; }
+        else {
+            if (m === 'reaction') {
+                el.textContent = '🏆 ' + fmtTime(bestMs);
+            } else if (m === 'stroop') {
+                el.textContent = '🏆 ' + fmtTime(bestMs);
+            } else {
+                el.textContent = '🏆 ' + fmtTime(bestMs);
+            }
+        }
+    });
+}
+
+function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+function startTimer(onTick) {
+    stopTimer();
+    timerStart = performance.now();
+    timerInterval = setInterval(() => onTick(performance.now() - timerStart), 100);
+}
+function elapsed() { return performance.now() - timerStart; }
+
+function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ================= 状态栏 =================
+function renderStatus() {
+    const mode = MODES[currentMode];
+    const bar = $('status-bar');
+    const diffOpts = mode.diffs.map(d =>
+        `<option value="${d}" ${d == currentDiff ? 'selected' : ''}>${mode.diffLabel(d)}</option>`
+    ).join('');
+    bar.innerHTML = `
+        <span class="info">⏱ <span id="timer">0.0 秒</span></span>
+        <span class="divider">|</span>
+        <span class="info" id="progress-info">—</span>
+        <span class="divider">|</span>
+        <span>难度</span>
+        <select id="diff-select" onchange="changeDiff(this.value)">${diffOpts}</select>
+        <button onclick="restartCurrent()">🔄 重开</button>
+        <button class="btn-back" onclick="backToMode()">↩ 返回</button>
+    `;
+}
+
+function setTimerText(ms) {
+    const el = $('timer');
+    if (el) el.textContent = fmtTime(ms);
+}
+function setProgressInfo(text) {
+    const el = $('progress-info');
+    if (el) el.textContent = text;
+}
+
+// ================= 规则面板 =================
+function renderRules() {
+    $('rules-title').textContent = `📖 ${MODES[currentMode].name}怎么玩`;
+    $('rules-body').innerHTML = RULES[currentMode].map(r =>
+        `<div class="rule-item"><span class="rule-icon">${r.i}</span><div>${r.t}</div></div>`
+    ).join('');
+}
+
+// ================= 模式切换 =================
+function selectMode(mode) {
+    currentMode = mode;
+    currentDiff = MODES[mode].diffs[Math.floor(MODES[mode].diffs.length / 2)];
+    document.querySelectorAll('.mode-card').forEach(c =>
+        c.classList.toggle('on', c.dataset.mode === mode));
+    renderStatus();
+    renderRules();
+    initGame();
+}
+
+function backToMode() {
+    stopTimer();
+    game = null;
+    $('stage').innerHTML = '<div style="color:#888;font-size:14px">已退出，点上方卡片开始游戏</div>';
+    setProgressInfo('—');
+    $('timer') && ($('timer').textContent = '0.0 秒');
+}
+
+function changeDiff(val) {
+    currentDiff = isNaN(val) ? val : parseInt(val, 10);
+    initGame();
+}
+
+function restartCurrent() { initGame(); }
+
+function initGame() {
+    closeWin();
+    stopTimer();
+    renderStatus();
+    renderRules();
+    setTimerText(0);
+    if (currentMode === 'schulte') initSchulte();
+    else if (currentMode === 'memory') initMemory();
+    else if (currentMode === 'reaction') initReaction();
+    else if (currentMode === 'stroop') initStroop();
+}
+
+// ================= 🎯 找数字（舒尔特） =================
+function initSchulte() {
+    const n = currentDiff;
+    const total = n * n;
+    const nums = shuffle([...Array(total).keys()].map(i => i + 1));
+    game = { n, next: 1, total, nums, cells: [] };
+    setProgressInfo(`已点 0 / ${total}`);
+    const stage = $('stage');
+    stage.innerHTML = `<div class="schulte-grid" id="grid" style="grid-template-columns: repeat(${n}, 1fr)"></div>`;
+    const grid = $('grid');
+    nums.forEach((num, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'schulte-cell';
+        cell.textContent = num;
+        cell.dataset.num = num;
+        cell.onclick = () => clickSchulte(cell, num);
+        grid.appendChild(cell);
+        game.cells.push(cell);
+    });
+}
+
+function clickSchulte(cell, num) {
+    if (num === game.next) {
+        if (game.next === 1) startTimer(setTimerText);
+        cell.classList.add('done');
+        cell.onclick = null;
+        game.next++;
+        setProgressInfo(`已点 ${game.next - 1} / ${game.total}`);
+        if (game.next > game.total) {
+            const ms = elapsed();
+            stopTimer();
+            finishSchulte(ms);
+        }
+    } else {
+        cell.classList.add('err');
+        setTimeout(() => cell.classList.remove('err'), 400);
+    }
+}
+
+function finishSchulte(ms) {
+    const k = bestKey(currentMode, currentDiff);
+    const record = isBetter(currentMode, currentDiff, ms);
+    if (record) { best[k] = ms; saveBest(); renderBest(); }
+    showWin('🎉 全部点完！', `用时 ${fmtTime(ms)}`, '', record);
+}
+
+// ================= 🃏 翻牌配对 =================
+function initMemory() {
+    const pairs = currentDiff;
+    const icons = shuffle(EMOJIS).slice(0, pairs);
+    const cards = shuffle([...icons, ...icons]);
+    game = { total: pairs, matched: 0, flipped: [], lock: false, cards: [] };
+    setProgressInfo(`已配对 0 / ${pairs}`);
+    const cols = pairs <= 4 ? 4 : pairs <= 6 ? 4 : pairs <= 8 ? 4 : 5;
+    const stage = $('stage');
+    stage.innerHTML = `<div class="memory-grid" id="mgrid" style="grid-template-columns: repeat(${cols}, 1fr)"></div>`;
+    const grid = $('mgrid');
+    cards.forEach((icon, i) => {
+        const card = document.createElement('div');
+        card.className = 'mem-card';
+        card.innerHTML = `<div class="mem-inner">
+            <div class="mem-face mem-back">❓</div>
+            <div class="mem-face mem-front">${icon}</div>
+        </div>`;
+        card.dataset.icon = icon;
+        card.dataset.idx = i;
+        card.onclick = () => clickMemory(card, icon);
+        grid.appendChild(card);
+        game.cards.push(card);
+    });
+}
+
+function clickMemory(card, icon) {
+    if (game.lock || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+    if (game.flipped.length === 0) startTimer(setTimerText);
+    card.classList.add('flipped');
+    game.flipped.push({ card, icon });
+    if (game.flipped.length === 2) {
+        game.lock = true;
+        const [a, b] = game.flipped;
+        if (a.icon === b.icon) {
+            setTimeout(() => {
+                a.card.classList.add('matched');
+                b.card.classList.add('matched');
+                game.matched++;
+                setProgressInfo(`已配对 ${game.matched} / ${game.total}`);
+                game.flipped = [];
+                game.lock = false;
+                if (game.matched >= game.total) {
+                    const ms = elapsed();
+                    stopTimer();
+                    finishMemory(ms);
+                }
+            }, 350);
+        } else {
+            setTimeout(() => {
+                a.card.classList.remove('flipped');
+                b.card.classList.remove('flipped');
+                game.flipped = [];
+                game.lock = false;
+            }, 850);
+        }
+    }
+}
+
+function finishMemory(ms) {
+    const k = bestKey(currentMode, currentDiff);
+    const record = isBetter(currentMode, currentDiff, ms);
+    if (record) { best[k] = ms; saveBest(); renderBest(); }
+    showWin('🎉 全部配对！', `用时 ${fmtTime(ms)}`, '', record);
+}
+
+// ================= ⚡ 反应点点点 =================
+function initReaction() {
+    game = { round: 0, total: 5, times: [], lock: true, phase: 'idle' };
+    setProgressInfo(`第 0 / ${game.total} 轮`);
+    const stage = $('stage');
+    stage.innerHTML = `<div class="reaction-area" id="rarea">👆 点这里开始</div>`;
+    const area = $('rarea');
+    area.onclick = () => {
+        if (game.phase === 'idle' || game.phase === 'done') startReactionRound();
+        else if (game.phase === 'wait') tooFast();
+        else if (game.phase === 'go') reactHit();
+    };
+    game.area = area;
+}
+
+function startReactionRound() {
+    game.round++;
+    if (game.round > game.total) return;
+    setProgressInfo(`第 ${game.round} / ${game.total} 轮`);
+    game.phase = 'wait';
+    game.area.className = 'reaction-area wait';
+    game.area.textContent = '🔴 等变绿…';
+    game.lock = true;
+    let delay;
+    if (currentDiff === 'slow') delay = 1500 + Math.random() * 1500;
+    else if (currentDiff === 'med') delay = 800 + Math.random() * 1200;
+    else if (currentDiff === 'fast') delay = 400 + Math.random() * 800;
+    else delay = 400 + Math.random() * 2600;
+    game.timer = setTimeout(() => {
+        if (game.phase !== 'wait') return;
+        game.phase = 'go';
+        game.area.className = 'reaction-area go';
+        game.area.textContent = '🟢 点！';
+        game.startT = performance.now();
+    }, delay);
+}
+
+function tooFast() {
+    clearTimeout(game.timer);
+    game.phase = 'toofast';
+    game.area.className = 'reaction-area toofast';
+    game.area.textContent = '⚡ 抢跑！1 秒后重来';
+    toast('抢跑了，重新开始本轮', 'err');
+    game.round--;
+    setTimeout(() => startReactionRound(), 1200);
+}
+
+function reactHit() {
+    const rt = performance.now() - game.startT;
+    game.times.push(rt);
+    game.phase = 'idle';
+    game.area.className = 'reaction-area';
+    game.area.textContent = `✅ ${rt.toFixed(0)} ms`;
+    if (game.round >= game.total) {
+        const avg = game.times.reduce((s, x) => s + x, 0) / game.times.length;
+        setTimeout(() => finishReaction(avg), 800);
+    } else {
+        setTimeout(() => startReactionRound(), 800);
+    }
+}
+
+function finishReaction(avgMs) {
+    const k = bestKey(currentMode, currentDiff);
+    const record = isBetter(currentMode, currentDiff, avgMs);
+    if (record) { best[k] = avgMs; saveBest(); renderBest(); }
+    game.phase = 'done';
+    game.area.className = 'reaction-area go';
+    game.area.textContent = `平均 ${avgMs.toFixed(0)} ms`;
+    showWin('⚡ 反应完成！', `平均反应 ${avgMs.toFixed(0)} ms`, `本轮成绩：${game.times.map(t => t.toFixed(0)).join(' / ')} ms`, record);
+}
+
+// ================= 🎨 字色干扰（Stroop） =================
+function initStroop() {
+    const n = currentDiff;
+    game = { total: 10, idx: 0, correct: 0, lock: false, colors: STROOP_COLORS.slice(0, n) };
+    setProgressInfo(`第 0 / ${game.total} 题 · 正确 0`);
+    nextStroop();
+}
+
+function nextStroop() {
+    if (game.idx === 0) startTimer(setTimerText);
+    if (game.idx >= game.total) return finishStroop();
+    game.idx++;
+    setProgressInfo(`第 ${game.idx} / ${game.total} 题 · 正确 ${game.correct}`);
+    const colors = game.colors;
+    // 字义（一个颜色名）和文字颜色（另一个颜色）必须不同
+    const wordColorIdx = Math.floor(Math.random() * colors.length);
+    let inkColorIdx;
+    do { inkColorIdx = Math.floor(Math.random() * colors.length); } while (inkColorIdx === wordColorIdx && colors.length > 1);
+    const wordColor = colors[wordColorIdx];
+    const inkColor = colors[inkColorIdx];
+    game.answer = inkColor;  // 玩家应点文字颜色
+    game.lock = false;
+    const stage = $('stage');
+    stage.innerHTML = `
+        <div style="font-size:13px;color:#888;margin-bottom:4px">点字的<b style="color:#5c6dc7">颜色</b>（不是字义）</div>
+        <div class="stroop-word" id="sword" style="color:${inkColor.color}">${wordColor.name}</div>
+        <div class="stroop-choices" id="schoices"></div>
+    `;
+    const sc = $('schoices');
+    shuffle(colors).forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'stroop-btn';
+        btn.style.background = c.color;
+        btn.onclick = () => clickStroop(btn, c);
+        sc.appendChild(btn);
+    });
+}
+
+function clickStroop(btn, color) {
+    if (game.lock) return;
+    game.lock = true;
+    if (color.name === game.answer.name) {
+        btn.classList.add('correct');
+        game.correct++;
+        setTimeout(() => nextStroop(), 350);
+    } else {
+        btn.classList.add('wrong');
+        setTimeout(() => {
+            btn.classList.remove('wrong');
+            game.lock = false;
+        }, 400);
+    }
+}
+
+function finishStroop() {
+    const ms = elapsed();
+    stopTimer();
+    // 综合分：错误数 * 3000 + 用时
+    const wrong = game.total - game.correct;
+    const score = wrong * 3000 + ms;
+    const k = bestKey(currentMode, currentDiff);
+    const record = isBetter(currentMode, currentDiff, score);
+    if (record) { best[k] = score; saveBest(); renderBest(); }
+    showWin('🎨 完成！', `用时 ${fmtTime(ms)}`, `正确 ${game.correct}/${game.total}${wrong ? '（错 ' + wrong + '）' : '，全对！'}`, record);
+}
+
+// ================= 胜利弹窗 =================
+function showWin(title, time, extra, record) {
+    $('win-title').textContent = title;
+    $('win-time').textContent = time;
+    $('win-extra').textContent = extra || '';
+    $('win-record').style.display = record ? '' : 'none';
+    $('win-modal').classList.add('show');
+}
+function closeWin() { $('win-modal').classList.remove('show'); }
+
+// ================= 初始化 =================
+loadBest();
+renderBest();
+document.querySelectorAll('.mode-card').forEach(c => {
+    c.onclick = () => selectMode(c.dataset.mode);
+});
+$('win-modal').addEventListener('click', e => { if (e.target === $('win-modal')) closeWin(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWin(); });
+selectMode('schulte');
+</script>
+</body>
+</html>
