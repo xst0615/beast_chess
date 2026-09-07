@@ -71,6 +71,7 @@
         transition: .2s;
     }
     label.fl .copy-btn:hover { border-color: var(--primary); color: var(--primary2); }
+
     textarea, input[type="text"], input[type="password"], input[type="number"], select {
         width: 100%; background: var(--panel2); border: 1px solid var(--border);
         color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 13px;
@@ -205,6 +206,15 @@
         text-align: center; transition: .2s;
     }
     .history-toolbar .btn-tool:hover { border-color: var(--primary); color: var(--primary2); }
+
+    /* ===== 归档列表 ===== */
+    .archive-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+    .archive-item {
+        text-align: left; background: var(--panel2); border: 1px solid var(--border);
+        color: var(--text); padding: 10px 14px; border-radius: 8px; cursor: pointer;
+        font-size: 13px; transition: .2s; font-family: "SF Mono", Consolas, monospace;
+    }
+    .archive-item:hover { border-color: var(--primary); color: var(--primary2); }
 
     /* ===== 设置弹窗 ===== */
     .modal-mask {
@@ -341,8 +351,9 @@
         <div class="card">
             <h2><span class="dot"></span>历史任务 <span id="h-count" style="font-size:12px;color:var(--muted);font-weight:400"></span></h2>
             <div class="history-toolbar">
-                <button class="btn-tool" onclick="exportHistory()">⬇️ 导出历史</button>
+                <button class="btn-tool" onclick="saveTodayArchive()">📦 今日归档</button>
                 <button class="btn-tool" onclick="$('import-file').click()">⬆️ 导入历史</button>
+                <button class="btn-tool" onclick="openArchive()">📂 查看归档</button>
                 <input type="file" id="import-file" accept="application/json,.json" style="display:none" onchange="importHistory(event)">
             </div>
             <div id="history-list">
@@ -411,6 +422,18 @@
         <div class="modal-actions">
             <button class="btn-ghost" onclick="closeSettings()">取消</button>
             <button class="btn-save" onclick="saveSettings()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== 归档弹窗 ===== -->
+<div class="modal-mask" id="archive-mask">
+    <div class="modal">
+        <h3>📂 仓库归档历史</h3>
+        <div class="modal-sub">从 GitHub 仓库 <code>history/</code> 目录加载归档，合并到当前本地历史（按 video_id 去重，取较新记录）。</div>
+        <div class="archive-list" id="archive-list"></div>
+        <div class="modal-actions">
+            <button class="btn-ghost" onclick="closeArchive()">关闭</button>
         </div>
     </div>
 </div>
@@ -840,6 +863,10 @@ function removeHistory(i) {
 }
 
 // ================= 历史导入导出 =================
+// 仓库归档配置（owner/repo），如需改仓库直接改这里
+const ARCHIVE_REPO = 'xst0615/beast_chess';
+const ARCHIVE_DIR = 'history';
+
 function exportHistory() {
     if (!history.length) return toast('⚠️ 暂无历史可导出', 'err');
     const payload = {
@@ -862,6 +889,47 @@ function exportHistory() {
     toast(`✅ 已导出 ${history.length} 条历史`, 'ok');
 }
 
+// 按日期命名导出归档（文件名 history-YYYY-MM-DD.json），便于提交到仓库 history/ 目录
+function saveTodayArchive() {
+    if (!history.length) return toast('⚠️ 暂无历史可归档', 'err');
+    const payload = {
+        _type: 'agnes_video_history',
+        _version: 1,
+        _exported_at: new Date().toISOString(),
+        _count: history.length,
+        items: history
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    a.href = url;
+    a.download = `history-${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`✅ 已下载 ${a.download}，请提交到仓库 history/ 目录`, 'ok');
+}
+
+// 合并历史项到 localStorage（按 video_id/task_id 去重，取较新记录），返回有效项数
+function mergeHistoryItems(items) {
+    if (!Array.isArray(items)) throw new Error('格式不正确：找不到 items 数组');
+    const valid = items.filter(it => it && (it.video_id || it.task_id));
+    if (!valid.length) throw new Error('没有有效任务（缺少 video_id/task_id）');
+    const map = new Map();
+    const merge = arr => arr.forEach(it => {
+        const key = it.video_id || it.task_id;
+        const prev = map.get(key);
+        if (!prev || (it.created_at || 0) >= (prev.created_at || 0)) map.set(key, it);
+    });
+    merge(history);
+    merge(valid);
+    history = [...map.values()].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 50);
+    saveHistory(); renderHistory();
+    return valid.length;
+}
+
 function importHistory(ev) {
     const file = ev.target.files && ev.target.files[0];
     ev.target.value = ''; // 允许重复导入同一文件
@@ -871,23 +939,8 @@ function importHistory(ev) {
         try {
             const data = JSON.parse(reader.result);
             const items = Array.isArray(data) ? data : data.items;
-            if (!Array.isArray(items)) throw new Error('文件格式不正确：找不到 items 数组');
-            // 基本字段校验，丢弃无效项
-            const valid = items.filter(it => it && (it.video_id || it.task_id));
-            if (!valid.length) throw new Error('文件中没有有效任务（缺少 video_id/task_id）');
-
-            // 按 video_id/task_id 去重，新导入的覆盖旧记录（取较新 created_at）
-            const map = new Map();
-            const merge = arr => arr.forEach(it => {
-                const key = it.video_id || it.task_id;
-                const prev = map.get(key);
-                if (!prev || (it.created_at || 0) >= (prev.created_at || 0)) map.set(key, it);
-            });
-            merge(history);
-            merge(valid);
-            history = [...map.values()].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 50);
-            saveHistory(); renderHistory();
-            toast(`✅ 已导入 ${valid.length} 条，当前共 ${history.length} 条`, 'ok');
+            const n = mergeHistoryItems(items);
+            toast(`✅ 已导入 ${n} 条，当前共 ${history.length} 条`, 'ok');
         } catch (err) {
             toast('❌ 导入失败：' + err.message, 'err');
         }
@@ -896,12 +949,63 @@ function importHistory(ev) {
     reader.readAsText(file);
 }
 
+// ================= 仓库归档查看 =================
+// 通过 GitHub API 列仓库 history/ 目录下的 .json 归档
+async function listArchives() {
+    const url = `https://api.github.com/repos/${ARCHIVE_REPO}/contents/${ARCHIVE_DIR}`;
+    const resp = await fetch(url, { headers: { 'Accept': 'application/vnd.github+json' } });
+    if (resp.status === 404) return []; // 目录不存在或为空
+    if (!resp.ok) throw new Error('GitHub API HTTP ' + resp.status + '（可能接口限流，稍后再试）');
+    const data = await resp.json();
+    return Array.isArray(data) ? data.filter(f => f.name && f.name.endsWith('.json')) : [];
+}
+
+async function openArchive() {
+    $('archive-mask').classList.add('show');
+    const list = $('archive-list');
+    list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">加载中…</div>';
+    try {
+        const files = await listArchives();
+        if (!files.length) {
+            list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px;line-height:1.7">仓库 history/ 目录暂无归档。<br>请先点「📦 今日归档」导出 JSON，放入仓库 history/ 目录并推送。</div>';
+            return;
+        }
+        // 按文件名倒序（日期新的在前）
+        files.sort((a, b) => a.name < b.name ? 1 : -1);
+        list.innerHTML = files.map(f => {
+            const dl = esc(f.download_url || '');
+            const nm = esc(f.name);
+            return `<button class="archive-item" onclick="loadArchive('${dl}','${nm}')">${nm}</button>`;
+        }).join('');
+    } catch (err) {
+        list.innerHTML = `<div class="error-box">${esc(err.message)}</div>`;
+    }
+}
+
+function closeArchive() { $('archive-mask').classList.remove('show'); }
+
+async function loadArchive(url, name) {
+    try {
+        toast('⬇️ 正在加载归档 ' + name + ' …');
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('下载归档失败: HTTP ' + resp.status);
+        const data = await resp.json();
+        const items = Array.isArray(data) ? data : data.items;
+        const n = mergeHistoryItems(items);
+        toast(`✅ 已从 ${name} 合并 ${n} 条历史`, 'ok');
+        closeArchive();
+    } catch (err) {
+        toast('❌ 加载归档失败: ' + err.message, 'err');
+    }
+}
+
 // ================= 初始化 =================
 loadState();
 renderHistory();
 $('settings-mask').addEventListener('click', e => { if (e.target === $('settings-mask')) closeSettings(); });
+$('archive-mask').addEventListener('click', e => { if (e.target === $('archive-mask')) closeArchive(); });
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeSettings();
+    if (e.key === 'Escape') { closeSettings(); closeArchive(); }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') createTask();
 });
 </script>
