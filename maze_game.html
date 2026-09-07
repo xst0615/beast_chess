@@ -161,7 +161,7 @@
             <div class="rule-item"><span class="rule-icon">⭐</span><div><b>收集星星：</b>走到星星格上自动收集，全部收完才能通关哦！</div></div>
             <div class="rule-item"><span class="rule-icon">🏁</span><div><b>到终点：</b>星星没收完就到终点，会提示"还有星星"！</div></div>
             <div class="rule-item"><span class="rule-icon">⌨️</span><div><b>键盘：</b>方向键或 WASD 移动小绿点！</div></div>
-            <div class="rule-item"><span class="rule-icon">👆</span><div><b>触屏：</b>点击相邻格子，或在迷宫上滑动手指！</div></div>
+            <div class="rule-item"><span class="rule-icon">👆</span><div><b>拖动：</b>手指/鼠标按住迷宫拖动，小绿点会自动寻路跟过来！按一下则走一格！</div></div>
             <div class="rule-item"><span class="rule-icon">💡</span><div><b>提示：</b>点「提示」按钮，会高亮最近星星的方向！</div></div>
             <div class="rule-item"><span class="rule-icon">⏱</span><div><b>计时：</b>开始移动就计时，越快越好！</div></div>
         </div>
@@ -531,48 +531,85 @@ document.addEventListener('keydown', e => {
     else if (['arrowright', 'd'].includes(k)) { e.preventDefault(); movePlayer(1, 0); }
 });
 
-// 点击相邻格
-canvas.addEventListener('click', e => {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / cellSize;
-    const y = (e.clientY - rect.top) / cellSize;
-    const gx = Math.floor(x), gy = Math.floor(y);
-    const dx = gx - player.x, dy = gy - player.y;
-    // 仅允许相邻（上下左右 1 格）
-    if (Math.abs(dx) + Math.abs(dy) === 1) {
-        movePlayer(dx, dy);
-    } else if (Math.abs(dx) + Math.abs(dy) > 1) {
-        toast('只能走到相邻的格子哦', 'warn');
-    }
-});
+// 拖动寻路：手指/鼠标按住后，玩家持续朝手指所在格自动寻路走过去
+let dragActive = false;
+let dragTarget = null;     // 当前手指/鼠标所在格
+let walkInterval = null;   // 自动行走定时器
+const WALK_INTERVAL = 90;  // 每步间隔 ms（小=走得快）
 
-// 触屏滑动
-let touchStart = null;
-canvas.addEventListener('touchstart', e => {
-    if (e.touches.length === 1) {
-        touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-}, { passive: true });
-canvas.addEventListener('touchend', e => {
-    if (!touchStart || !e.changedTouches.length) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStart.x;
-    const dy = t.clientY - touchStart.y;
-    const absX = Math.abs(dx), absY = Math.abs(dy);
-    if (Math.max(absX, absY) < 20) {
-        // 短按视为点击相邻格
-        const rect = canvas.getBoundingClientRect();
-        const gx = Math.floor((t.clientX - rect.left) / cellSize);
-        const gy = Math.floor((t.clientY - rect.top) / cellSize);
-        const ddx = gx - player.x, ddy = gy - player.y;
-        if (Math.abs(ddx) + Math.abs(ddy) === 1) movePlayer(ddx, ddy);
-        touchStart = null;
+function clientToCell(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const gx = Math.floor((clientX - rect.left) / cellSize);
+    const gy = Math.floor((clientY - rect.top) / cellSize);
+    if (gx < 0 || gx >= gw || gy < 0 || gy >= gh) return null;
+    return { x: gx, y: gy };
+}
+
+function startDrag(clientX, clientY) {
+    if (finished) return;
+    const cell = clientToCell(clientX, clientY);
+    if (!cell) return;
+    dragActive = true;
+    dragTarget = cell;
+    // 立即走一步（响应短按）
+    walkOneStep();
+    startWalking();
+}
+
+function updateDragTarget(clientX, clientY) {
+    if (!dragActive) return;
+    const cell = clientToCell(clientX, clientY);
+    if (cell) dragTarget = cell;
+}
+
+function walkOneStep() {
+    if (!dragActive || !dragTarget || finished) return;
+    // 已到目标格则停
+    if (player.x === dragTarget.x && player.y === dragTarget.y) {
+        stopWalking();
         return;
     }
-    if (absX > absY) movePlayer(dx > 0 ? 1 : -1, 0);
-    else movePlayer(0, dy > 0 ? 1 : -1);
-    touchStart = null;
-}, { passive: true });
+    // BFS 求下一步方向
+    const dir = bfsNextDir(player.x, player.y, dragTarget.x, dragTarget.y);
+    if (dir) movePlayer(dir.dx, dir.dy);
+}
+
+function startWalking() {
+    stopWalking();
+    walkInterval = setInterval(walkOneStep, WALK_INTERVAL);
+}
+
+function stopWalking() {
+    if (walkInterval) { clearInterval(walkInterval); walkInterval = null; }
+    dragActive = false;
+    dragTarget = null;
+}
+
+// 鼠标拖动
+canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startDrag(e.clientX, e.clientY);
+});
+canvas.addEventListener('mousemove', e => {
+    if (dragActive) updateDragTarget(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', () => { if (dragActive) stopWalking(); });
+
+// 触屏拖动（touch-action: none 已在 CSS 中设置，事件用 passive: false 才能 preventDefault）
+canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+        e.preventDefault();
+        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 1 && dragActive) {
+        e.preventDefault();
+        updateDragTarget(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
+window.addEventListener('touchend', () => { if (dragActive) stopWalking(); });
+window.addEventListener('touchcancel', () => { if (dragActive) stopWalking(); });
 
 // ================= 胜利弹窗 =================
 function showWin(ms, record) {
