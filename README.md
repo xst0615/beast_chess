@@ -17,6 +17,7 @@
 | `military_chess.html` | 二人军棋 |
 | `nine_rings.html` | 九连环 |
 | `focus_training.html` | 专注力训练（舒尔特方格 / 翻牌配对 / 反应速度 / Stroop 字色干扰 四合一，难度递进） |
+| `maze_game.html` | 迷宫探险（4 档难度，收集星星通关，键盘/触屏/拖拽多种操作） |
 
 ### 工具与内容页
 
@@ -90,6 +91,7 @@ npm start
 ├── military_chess.html     # 二人军棋
 ├── nine_rings.html         # 九连环
 ├── focus_training.html     # 专注力训练（四合一）
+├── maze_game.html          # 迷宫探险
 ├── agnes_video.html        # 视频生成工作台
 ├── article_shuixiang.html  # 文章页
 ├── media_hub/              # 自媒体发布工具

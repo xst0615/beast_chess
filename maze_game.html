@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>迷宫探险</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #e8f5e9 0%, #fff3e0 100%);
+        min-height: 100vh;
+        display: flex; flex-direction: column; align-items: center;
+        padding: 15px;
+    }
+    h1 {
+        color: #2e7d32; font-size: 28px; margin-bottom: 14px;
+        letter-spacing: 3px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* ===== 状态栏 ===== */
+    .status-bar {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+        background: #fff; padding: 8px 12px; border-radius: 12px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.08); width: 100%; max-width: 560px;
+        font-size: 14px; margin-bottom: 12px;
+    }
+    .status-bar .info { font-weight: bold; color: #2e7d32; }
+    .status-bar .divider { color: #ccc; margin: 0 4px; }
+    .status-bar select, .status-bar button {
+        padding: 6px 10px; border: none; border-radius: 8px;
+        background: #2e7d32; color: #fff; font-weight: bold;
+        cursor: pointer; font-size: 13px; font-family: inherit;
+        transition: background 0.2s, transform 0.1s;
+    }
+    .status-bar select { background: #f5f5f5; color: #2e7d32; border: 2px solid #ddd; }
+    .status-bar button:hover { background: #1b5e20; transform: translateY(-1px); }
+    .status-bar .btn-back { background: #aaa; }
+    .status-bar .btn-back:hover { background: #888; }
+    .status-bar .btn-hint { background: #ff8f00; }
+    .status-bar .btn-hint:hover { background: #e65100; }
+
+    /* ===== 迷宫画板 ===== */
+    .board-wrap {
+        position: relative; width: 100%; max-width: 560px; aspect-ratio: 1;
+        background: #fffde7; border-radius: 16px; border: 4px solid #a5d6a7;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.12); overflow: hidden;
+    }
+    #maze-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+
+    /* ===== 移动按钮（移动端辅助） ===== */
+    .move-pad {
+        display: none; margin-top: 14px;
+        grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
+        gap: 6px;
+    }
+    @media (max-width: 700px) { .move-pad { display: grid; } }
+    .move-pad button {
+        background: #fff; border: 2px solid #a5d6a7; border-radius: 12px;
+        font-size: 24px; color: #2e7d32; cursor: pointer; transition: all 0.15s;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .move-pad button:active { background: #c8e6c9; transform: scale(0.95); }
+    .move-pad .empty { visibility: hidden; }
+    .move-pad .up { grid-area: 1 / 2; }
+    .move-pad .left { grid-area: 2 / 1; }
+    .move-pad .right { grid-area: 2 / 3; }
+    .move-pad .down { grid-area: 3 / 2; }
+
+    /* ===== 规则面板 ===== */
+    .rules-panel { width: 100%; max-width: 560px; margin-top: 14px; }
+    .rules-panel details {
+        background: #fff; border: 2px solid #c5e1c5; border-radius: 14px; overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .rules-panel summary {
+        list-style: none; cursor: pointer; padding: 12px 16px;
+        background: linear-gradient(135deg, #2e7d32, #43a047); color: #fff;
+        font-weight: bold; font-size: 16px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .rules-panel summary::-webkit-details-marker { display: none; }
+    .rules-panel summary .arrow { transition: transform 0.3s; font-size: 12px; opacity: 0.8; }
+    .rules-panel details[open] summary .arrow { transform: rotate(180deg); }
+    .panel-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rule-item {
+        display: flex; gap: 10px; align-items: flex-start; background: #f1f8f1;
+        border: 1px solid #dcedc8; border-radius: 10px; padding: 9px 10px;
+        font-size: 14px; line-height: 1.5; color: #33691e;
+    }
+    .rule-icon { font-size: 22px; background: #e8f5e9; border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rule-item b { color: #2e7d32; }
+
+    /* ===== 胜利弹窗 ===== */
+    .win-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .win-modal.show { display: flex; }
+    .win-card { background: #fff; padding: 30px 40px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: pop 0.4s ease; max-width: 90vw; }
+    @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .win-card h2 { font-size: 26px; color: #2e7d32; margin-bottom: 10px; }
+    .win-card p { color: #33691e; font-size: 15px; margin-bottom: 8px; }
+    .win-card .record { color: #ff6f00; font-weight: bold; font-size: 17px; margin: 8px 0; }
+    .win-card button { padding: 10px 24px; border: none; border-radius: 10px; background: #2e7d32; color: #fff; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; margin: 4px; }
+    .win-card button:hover { background: #1b5e20; }
+    .win-card .btn-close { background: #aaa; }
+    .win-card .btn-close:hover { background: #888; }
+
+    #fireworks { position: fixed; inset: 0; pointer-events: none; z-index: 99; }
+
+    /* ===== Toast ===== */
+    .toast {
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+        background: #2e7d32; color: #fff; padding: 10px 20px; border-radius: 10px;
+        font-size: 14px; z-index: 200; opacity: 0; pointer-events: none; transition: all 0.3s;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { background: #e53935; }
+    .toast.ok { background: #43a047; }
+    .toast.warn { background: #ff8f00; }
+</style>
+</head>
+<body>
+<h1>🗺️ 迷宫探险 🗺️</h1>
+
+<div class="status-bar" id="status-bar">
+    <span class="info">⏱ <span id="timer">0.0 秒</span></span>
+    <span class="divider">|</span>
+    <span class="info" id="progress-info">⭐ 0/0</span>
+    <span class="divider">|</span>
+    <span>难度</span>
+    <select id="diff-select" onchange="changeDiff(this.value)">
+        <option value="easy">🌱 简单 8×8</option>
+        <option value="medium" selected>⭐ 中等 12×12</option>
+        <option value="hard">🔥 困难 16×16</option>
+        <option value="challenge">👑 挑战 20×20</option>
+    </select>
+    <button class="btn-hint" onclick="showHint()">💡 提示</button>
+    <button onclick="restartCurrent()">🔄 重开</button>
+</div>
+
+<div class="board-wrap">
+    <canvas id="maze-canvas"></canvas>
+</div>
+
+<div class="move-pad">
+    <button class="empty"></button>
+    <button class="up" onclick="movePlayer(0, -1)">⬆</button>
+    <button class="empty"></button>
+    <button class="left" onclick="movePlayer(-1, 0)">⬅</button>
+    <button class="empty"></button>
+    <button class="right" onclick="movePlayer(1, 0)">➡</button>
+    <button class="empty"></button>
+    <button class="down" onclick="movePlayer(0, 1)">⬇</button>
+    <button class="empty"></button>
+</div>
+
+<div class="rules-panel">
+    <details open>
+        <summary><span>📖 迷宫探险怎么玩</span><span class="arrow">▼</span></summary>
+        <div class="panel-body">
+            <div class="rule-item"><span class="rule-icon">🎯</span><div><b>怎么赢：</b>从起点出发，收集所有 ⭐ 后到达 🏁 终点！</div></div>
+            <div class="rule-item"><span class="rule-icon">⭐</span><div><b>收集星星：</b>走到星星格上自动收集，全部收完才能通关哦！</div></div>
+            <div class="rule-item"><span class="rule-icon">🏁</span><div><b>到终点：</b>星星没收完就到终点，会提示"还有星星"！</div></div>
+            <div class="rule-item"><span class="rule-icon">⌨️</span><div><b>键盘：</b>方向键或 WASD 移动小绿点！</div></div>
+            <div class="rule-item"><span class="rule-icon">👆</span><div><b>触屏：</b>点击相邻格子，或在迷宫上滑动手指！</div></div>
+            <div class="rule-item"><span class="rule-icon">💡</span><div><b>提示：</b>点「提示」按钮，会高亮最近星星的方向！</div></div>
+            <div class="rule-item"><span class="rule-icon">⏱</span><div><b>计时：</b>开始移动就计时，越快越好！</div></div>
+        </div>
+    </details>
+</div>
+
+<div class="win-modal" id="win-modal">
+    <div class="win-card">
+        <h2 id="win-title">🎉 通关啦！</h2>
+        <p id="win-time"></p>
+        <p id="win-extra"></p>
+        <div class="record" id="win-record" style="display:none">🏆 破纪录！</div>
+        <button onclick="restartCurrent()">🔄 再玩一次</button>
+        <button class="btn-close" onclick="closeWin()">✕ 关闭</button>
+    </div>
+</div>
+
+<canvas id="fireworks"></canvas>
+<div class="toast" id="toast"></div>
+
+<script>
+// ================= 配置 =================
+const LS_KEY = 'maze_best';
+
+const DIFFS = {
+    easy:      { name: '简单', icon: '🌱', size: 8,  stars: 3 },
+    medium:    { name: '中等', icon: '⭐', size: 12, stars: 5 },
+    hard:      { name: '困难', icon: '🔥', size: 16, stars: 8 },
+    challenge: { name: '挑战', icon: '👑', size: 20, stars: 12 },
+};
+
+// ================= 状态 =================
+let best = {};
+let currentDiff = 'medium';
+let maze = null;          // 二维数组：0=通道，1=墙
+let gw = 0, gh = 0;       // 网格宽高（含墙）
+let player = { x: 0, y: 0 };
+let stars = [];           // [{x, y, collected}]
+let endPos = { x: 0, y: 0 };
+let startPos = { x: 0, y: 0 };
+let timerStart = 0;
+let timerInterval = null;
+let started = false;
+let finished = false;
+let hintArrow = null;     // {dx, dy, expire}
+
+// ================= 工具 =================
+const $ = id => document.getElementById(id);
+
+function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(t._tm);
+    t._tm = setTimeout(() => t.className = 'toast', 2200);
+}
+
+function fmtTime(ms) {
+    if (ms < 10000) return (ms / 1000).toFixed(2) + ' 秒';
+    return (ms / 1000).toFixed(1) + ' 秒';
+}
+
+function loadBest() {
+    try { best = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { best = {}; }
+}
+function saveBest() { localStorage.setItem(LS_KEY, JSON.stringify(best)); }
+
+function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ================= 迷宫生成 - 递归回溯 =================
+function generateMaze(size) {
+    // 实际网格大小 = size * 2 + 1（含墙）
+    const w = size * 2 + 1;
+    const h = size * 2 + 1;
+    // 初始全墙
+    const grid = Array.from({ length: h }, () => Array(w).fill(1));
+    const visited = Array.from({ length: h }, () => Array(w).fill(false));
+    const stack = [[1, 1]];
+    visited[1][1] = true;
+    grid[1][1] = 0;  // 起点为通道
+
+    while (stack.length) {
+        const [cx, cy] = stack[stack.length - 1];
+        // 邻居（距离 2 格）
+        const dirs = shuffle([[0, -2], [0, 2], [-2, 0], [2, 0]]);
+        let moved = false;
+        for (const [dx, dy] of dirs) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx > 0 && nx < w - 1 && ny > 0 && ny < h - 1 && !visited[ny][nx]) {
+                // 打通中间墙
+                grid[cy + dy / 2][cx + dx / 2] = 0;
+                grid[ny][nx] = 0;
+                visited[ny][nx] = true;
+                stack.push([nx, ny]);
+                moved = true;
+                break;
+            }
+        }
+        if (!moved) stack.pop();
+    }
+    return { grid, w, h };
+}
+
+// ================= 星星放置 =================
+function placeStars(count) {
+    // 收集所有通道格（非起点、非终点）
+    const paths = [];
+    for (let y = 0; y < gh; y++) {
+        for (let x = 0; x < gw; x++) {
+            if (maze[y][x] === 0 && !(x === startPos.x && y === startPos.y) && !(x === endPos.x && y === endPos.y)) {
+                paths.push({ x, y });
+            }
+        }
+    }
+    const shuffled = shuffle(paths);
+    return shuffled.slice(0, Math.min(count, shuffled.length)).map(p => ({ ...p, collected: false }));
+}
+
+// ================= BFS 求最短路径方向（用于提示） =================
+function bfsNextDir(fromX, fromY, toX, toY) {
+    if (fromX === toX && fromY === toY) return null;
+    const visited = Array.from({ length: gh }, () => Array(gw).fill(false));
+    const prev = Array.from({ length: gh }, () => Array(gw).fill(null));
+    const queue = [[fromX, fromY]];
+    visited[fromY][fromX] = true;
+    while (queue.length) {
+        const [x, y] = queue.shift();
+        if (x === toX && y === toY) break;
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < gw && ny >= 0 && ny < gh && !visited[ny][nx] && maze[ny][nx] === 0) {
+                visited[ny][nx] = true;
+                prev[ny][nx] = { x, y };
+                queue.push([nx, ny]);
+            }
+        }
+    }
+    // 回溯第一步
+    let cur = { x: toX, y: toY };
+    if (!prev[toY][toX]) return null;  // 不可达
+    let firstStep = null;
+    while (prev[cur.y][cur.x]) {
+        firstStep = cur;
+        cur = prev[cur.y][cur.x];
+    }
+    if (!firstStep) return null;
+    return { dx: firstStep.x - fromX, dy: firstStep.y - fromY };
+}
+
+// ================= 初始化游戏 =================
+function initGame() {
+    closeWin();
+    stopTimer();
+    const diff = DIFFS[currentDiff];
+    const result = generateMaze(diff.size);
+    maze = result.grid;
+    gw = result.w;
+    gh = result.h;
+    startPos = { x: 1, y: 1 };
+    endPos = { x: gw - 2, y: gh - 2 };
+    player = { x: startPos.x, y: startPos.y };
+    stars = placeStars(diff.stars);
+    started = false;
+    finished = false;
+    hintArrow = null;
+    setTimerText(0);
+    updateProgress();
+    resizeCanvas();
+    draw();
+}
+
+function restartCurrent() { initGame(); }
+
+function changeDiff(val) {
+    currentDiff = val;
+    $('diff-select').blur();
+    initGame();
+}
+
+// ================= 计时 =================
+function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+function startTimer() {
+    stopTimer();
+    timerStart = performance.now();
+    started = true;
+    timerInterval = setInterval(() => setTimerText(performance.now() - timerStart), 100);
+}
+function elapsed() { return performance.now() - timerStart; }
+function setTimerText(ms) {
+    const el = $('timer');
+    if (el) el.textContent = fmtTime(ms);
+}
+
+function updateProgress() {
+    const collected = stars.filter(s => s.collected).length;
+    $('progress-info').textContent = `⭐ ${collected}/${stars.length}`;
+}
+
+// ================= 渲染 =================
+const canvas = $('maze-canvas');
+const ctx = canvas.getContext('2d');
+let cellSize = 0;
+
+function resizeCanvas() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const size = Math.min(rect.width, rect.height);
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cellSize = size / Math.max(gw, gh);
+}
+
+window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+
+function draw() {
+    if (!maze) return;
+    const cs = cellSize;
+    // 背景
+    ctx.fillStyle = '#fffde7';
+    ctx.fillRect(0, 0, gw * cs, gh * cs);
+    // 通道与墙
+    for (let y = 0; y < gh; y++) {
+        for (let x = 0; x < gw; x++) {
+            if (maze[y][x] === 1) {
+                ctx.fillStyle = '#7cb342';
+                ctx.fillRect(x * cs, y * cs, cs + 0.5, cs + 0.5);
+            }
+        }
+    }
+    // 起点（淡绿）
+    ctx.fillStyle = '#c8e6c9';
+    ctx.fillRect(startPos.x * cs, startPos.y * cs, cs + 0.5, cs + 0.5);
+    // 终点（旗子）
+    ctx.fillStyle = '#ffeb3b';
+    ctx.fillRect(endPos.x * cs, endPos.y * cs, cs + 0.5, cs + 0.5);
+    ctx.font = `${cs * 0.9}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🏁', endPos.x * cs + cs / 2, endPos.y * cs + cs / 2 + cs * 0.05);
+    // 星星
+    ctx.font = `${cs * 0.85}px sans-serif`;
+    for (const s of stars) {
+        if (s.collected) continue;
+        ctx.fillText('⭐', s.x * cs + cs / 2, s.y * cs + cs / 2 + cs * 0.05);
+    }
+    // 提示箭头（闪烁）
+    if (hintArrow && performance.now() < hintArrow.expire) {
+        const t = performance.now();
+        const blink = Math.floor(t / 200) % 2 === 0;
+        if (blink) {
+            ctx.fillStyle = '#ff6f00';
+            const ax = player.x + hintArrow.dx;
+            const ay = player.y + hintArrow.dy;
+            ctx.fillRect(ax * cs + cs * 0.2, ay * cs + cs * 0.2, cs * 0.6, cs * 0.6);
+        }
+    } else if (hintArrow) {
+        hintArrow = null;
+    }
+    // 玩家（绿色圆点）
+    const px = player.x * cs + cs / 2;
+    const py = player.y * cs + cs / 2;
+    ctx.fillStyle = '#2e7d32';
+    ctx.beginPath();
+    ctx.arc(px, py, cs * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(px - cs * 0.1, py - cs * 0.1, cs * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    // 若提示箭头仍存在，下一帧继续重绘
+    if (hintArrow && performance.now() < hintArrow.expire) {
+        requestAnimationFrame(draw);
+    }
+}
+
+// ================= 玩家移动 =================
+function movePlayer(dx, dy) {
+    if (finished) return;
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+    if (nx < 0 || nx >= gw || ny < 0 || ny >= gh) return;
+    if (maze[ny][nx] === 1) return;  // 墙
+    // 开始计时
+    if (!started) startTimer();
+    player.x = nx;
+    player.y = ny;
+    hintArrow = null;
+    // 检查星星
+    for (const s of stars) {
+        if (!s.collected && s.x === nx && s.y === ny) {
+            s.collected = true;
+            toast('⭐ 收集到星星！', 'ok');
+        }
+    }
+    updateProgress();
+    // 检查终点
+    if (nx === endPos.x && ny === endPos.y) {
+        const left = stars.filter(s => !s.collected).length;
+        if (left > 0) {
+            toast(`还有 ${left} 颗星星没收集！`, 'warn');
+        } else {
+            finishGame();
+        }
+    }
+    draw();
+}
+
+function finishGame() {
+    finished = true;
+    stopTimer();
+    const ms = elapsed();
+    const k = currentDiff;
+    const record = !best[k] || ms < best[k];
+    if (record) { best[k] = ms; saveBest(); }
+    showWin(ms, record);
+    launchFireworks();
+}
+
+// ================= 提示 =================
+function showHint() {
+    if (finished) return;
+    const remain = stars.filter(s => !s.collected);
+    if (!remain.length) {
+        // 全收集了，指向终点
+        const dir = bfsNextDir(player.x, player.y, endPos.x, endPos.y);
+        if (dir) {
+            hintArrow = { dx: dir.dx, dy: dir.dy, expire: performance.now() + 3000 };
+            toast('💡 跟着橙色提示走向终点', 'warn');
+            draw();
+        }
+        return;
+    }
+    // 找最近的星星（曼哈顿距离）
+    let nearest = remain[0];
+    let minD = Math.abs(remain[0].x - player.x) + Math.abs(remain[0].y - player.y);
+    for (const s of remain) {
+        const d = Math.abs(s.x - player.x) + Math.abs(s.y - player.y);
+        if (d < minD) { minD = d; nearest = s; }
+    }
+    const dir = bfsNextDir(player.x, player.y, nearest.x, nearest.y);
+    if (dir) {
+        hintArrow = { dx: dir.dx, dy: dir.dy, expire: performance.now() + 3000 };
+        toast('💡 跟着橙色提示走 3 秒', 'warn');
+        draw();
+    }
+}
+
+// ================= 输入 =================
+// 键盘
+document.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (['arrowup', 'w'].includes(k)) { e.preventDefault(); movePlayer(0, -1); }
+    else if (['arrowdown', 's'].includes(k)) { e.preventDefault(); movePlayer(0, 1); }
+    else if (['arrowleft', 'a'].includes(k)) { e.preventDefault(); movePlayer(-1, 0); }
+    else if (['arrowright', 'd'].includes(k)) { e.preventDefault(); movePlayer(1, 0); }
+});
+
+// 点击相邻格
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / cellSize;
+    const y = (e.clientY - rect.top) / cellSize;
+    const gx = Math.floor(x), gy = Math.floor(y);
+    const dx = gx - player.x, dy = gy - player.y;
+    // 仅允许相邻（上下左右 1 格）
+    if (Math.abs(dx) + Math.abs(dy) === 1) {
+        movePlayer(dx, dy);
+    } else if (Math.abs(dx) + Math.abs(dy) > 1) {
+        toast('只能走到相邻的格子哦', 'warn');
+    }
+});
+
+// 触屏滑动
+let touchStart = null;
+canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+        touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+}, { passive: true });
+canvas.addEventListener('touchend', e => {
+    if (!touchStart || !e.changedTouches.length) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    const absX = Math.abs(dx), absY = Math.abs(dy);
+    if (Math.max(absX, absY) < 20) {
+        // 短按视为点击相邻格
+        const rect = canvas.getBoundingClientRect();
+        const gx = Math.floor((t.clientX - rect.left) / cellSize);
+        const gy = Math.floor((t.clientY - rect.top) / cellSize);
+        const ddx = gx - player.x, ddy = gy - player.y;
+        if (Math.abs(ddx) + Math.abs(ddy) === 1) movePlayer(ddx, ddy);
+        touchStart = null;
+        return;
+    }
+    if (absX > absY) movePlayer(dx > 0 ? 1 : -1, 0);
+    else movePlayer(0, dy > 0 ? 1 : -1);
+    touchStart = null;
+}, { passive: true });
+
+// ================= 胜利弹窗 =================
+function showWin(ms, record) {
+    $('win-title').textContent = '🎉 通关啦！';
+    $('win-time').textContent = `用时 ${fmtTime(ms)}`;
+    const diff = DIFFS[currentDiff];
+    $('win-extra').textContent = `${diff.icon} ${diff.name} 难度 · 收集 ${diff.stars} 颗星星`;
+    $('win-record').style.display = record ? '' : 'none';
+    $('win-modal').classList.add('show');
+}
+function closeWin() { $('win-modal').classList.remove('show'); }
+
+// ================= 烟花（沿用 nine_rings 风格） =================
+const fwCanvas = $('fireworks');
+const fwCtx = fwCanvas.getContext('2d');
+let fwParticles = [];
+let fwActive = false;
+
+function resizeFw() {
+    fwCanvas.width = window.innerWidth;
+    fwCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeFw);
+resizeFw();
+
+function launchFireworks() {
+    const colors = ['#ff5252', '#ffab40', '#ffea00', '#69f0ae', '#40c4ff', '#b388ff', '#ff80ab'];
+    let bursts = 0;
+    const maxBursts = 6;
+    const burst = () => {
+        if (bursts >= maxBursts) { fwActive = false; return; }
+        bursts++;
+        const cx = fwCanvas.width * (0.2 + Math.random() * 0.6);
+        const cy = fwCanvas.height * (0.2 + Math.random() * 0.4);
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const count = 40 + Math.floor(Math.random() * 20);
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count;
+            const speed = 2 + Math.random() * 4;
+            fwParticles.push({
+                x: cx, y: cy,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1, color,
+                size: 2 + Math.random() * 2,
+            });
+        }
+        setTimeout(burst, 400 + Math.random() * 400);
+    };
+    fwActive = true;
+    burst();
+    if (!fwRafRunning) fwLoop();
+}
+
+let fwRafRunning = false;
+function fwLoop() {
+    fwRafRunning = true;
+    fwCtx.fillStyle = 'rgba(0,0,0,0.15)';
+    fwCtx.fillRect(0, 0, fwCanvas.width, fwCanvas.height);
+    fwParticles = fwParticles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.08;  // 重力
+        p.vx *= 0.99;
+        p.life -= 0.015;
+        if (p.life <= 0) return false;
+        fwCtx.globalAlpha = p.life;
+        fwCtx.fillStyle = p.color;
+        fwCtx.beginPath();
+        fwCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        fwCtx.fill();
+        return true;
+    });
+    fwCtx.globalAlpha = 1;
+    if (fwParticles.length > 0 || fwActive) {
+        requestAnimationFrame(fwLoop);
+    } else {
+        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+        fwRafRunning = false;
+    }
+}
+
+// ================= 初始化 =================
+loadBest();
+$('win-modal').addEventListener('click', e => { if (e.target === $('win-modal')) closeWin(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWin(); });
+// 默认中等难度
+initGame();
+</script>
+</body>
+</html>
