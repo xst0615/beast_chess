@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>软件设计师答题通</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #ede7f6 0%, #e3f2fd 100%);
+        min-height: 100vh;
+        display: flex; flex-direction: column; align-items: center;
+        padding: 15px;
+    }
+    h1 {
+        color: #5e35b1; font-size: 26px; margin-bottom: 14px;
+        letter-spacing: 2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* ===== 模式选择 ===== */
+    .mode-grid {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 12px; max-width: 720px; width: 100%; margin-bottom: 16px;
+    }
+    @media (max-width: 600px) { .mode-grid { grid-template-columns: 1fr; } }
+    .mode-card {
+        background: #fff; border: 3px solid transparent; border-radius: 14px;
+        padding: 18px 10px; text-align: center; cursor: pointer;
+        box-shadow: 0 4px 12px rgba(94,53,177,0.12);
+        transition: all 0.2s; font-family: inherit;
+    }
+    .mode-card:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(94,53,177,0.2); }
+    .mode-card.on { border-color: #5e35b1; background: #ede7f6; }
+    .mode-card .mc-icon { font-size: 32px; margin-bottom: 6px; }
+    .mode-card .mc-name { font-size: 15px; font-weight: bold; color: #5e35b1; }
+    .mode-card .mc-best { font-size: 11px; color: #888; margin-top: 4px; }
+
+    /* ===== 配置栏 ===== */
+    .config-bar {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+        background: #fff; padding: 10px 14px; border-radius: 12px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.08); width: 100%; max-width: 720px;
+        font-size: 14px; margin-bottom: 12px;
+    }
+    .config-bar .info { font-weight: bold; color: #5e35b1; }
+    .config-bar .divider { color: #ccc; margin: 0 4px; }
+    .config-bar select, .config-bar button {
+        padding: 6px 12px; border: none; border-radius: 8px;
+        background: #5e35b1; color: #fff; font-weight: bold;
+        cursor: pointer; font-size: 13px; font-family: inherit;
+        transition: background 0.2s, transform 0.1s;
+    }
+    .config-bar select { background: #f5f5f5; color: #5e35b1; border: 2px solid #ddd; }
+    .config-bar button:hover { background: #4a2b91; transform: translateY(-1px); }
+    .config-bar .btn-back { background: #aaa; }
+    .config-bar .btn-back:hover { background: #888; }
+
+    /* ===== 答题区 ===== */
+    .quiz-stage {
+        background: #fff; border-radius: 16px; border: 3px solid #d1c4e9;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.08); padding: 20px;
+        width: 100%; max-width: 720px; min-height: 320px;
+    }
+    .q-progress {
+        font-size: 13px; color: #5e35b1; margin-bottom: 12px;
+        display: flex; justify-content: space-between; align-items: center; gap: 12px;
+        padding-bottom: 8px; border-bottom: 1px dashed #e0e0e0;
+    }
+    .q-timer { color: #e53935; font-weight: bold; font-family: monospace; }
+    .q-timer.warn { animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0.4; } }
+    .q-card { margin-bottom: 16px; }
+    .q-type-tag {
+        display: inline-block; padding: 3px 10px; border-radius: 12px;
+        background: #ede7f6; color: #5e35b1; font-size: 12px; font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .q-tag { color: #888; font-size: 12px; margin-left: 8px; }
+    .q-stem {
+        font-size: 15px; line-height: 1.7; color: #333; margin-bottom: 14px;
+        white-space: pre-wrap; word-break: break-word;
+    }
+    .q-stem pre {
+        background: #263238; color: #eceff1; padding: 12px; border-radius: 8px;
+        overflow-x: auto; font-size: 13px; line-height: 1.5; margin: 8px 0;
+        font-family: "SF Mono", Consolas, monospace;
+    }
+    .q-stem code { background: #f3e5f5; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 13px; }
+    .q-stem pre code { background: transparent; padding: 0; color: inherit; }
+
+    /* 填空区 */
+    .blank {
+        margin: 14px 0; padding: 12px; background: #fafafa;
+        border: 1px solid #eee; border-radius: 10px;
+    }
+    .blank.correct { background: #e8f5e9; border-color: #66bb6a; }
+    .blank.wrong { background: #ffebee; border-color: #ef5350; }
+    .blank-label {
+        font-weight: bold; color: #5e35b1; margin-bottom: 8px; font-size: 14px;
+    }
+    .option-btn {
+        display: block; width: 100%; text-align: left;
+        padding: 10px 14px; margin: 6px 0; border: 2px solid #e0e0e0;
+        background: #fff; border-radius: 8px; cursor: pointer;
+        font-family: inherit; font-size: 14px; color: #333;
+        transition: all 0.15s;
+    }
+    .option-btn:hover { border-color: #9575cd; background: #f3e5f5; }
+    .option-btn.selected { border-color: #5e35b1; background: #ede7f6; font-weight: bold; }
+    .option-btn.correct-option { border-color: #43a047; background: #c8e6c9; color: #2e7d32; }
+    .option-btn.wrong-option { border-color: #e53935; background: #ffcdd2; color: #c62828; }
+    .option-btn:disabled { cursor: default; }
+    .option-btn:disabled:not(.correct-option):not(.wrong-option):not(.selected) { opacity: 0.6; }
+
+    .q-explain {
+        margin-top: 12px; padding: 12px; background: #fff8e1;
+        border: 1px solid #ffe082; border-radius: 10px;
+        font-size: 13px; line-height: 1.6; color: #5d4037;
+    }
+    .q-explain b { color: #e65100; }
+
+    /* 题目导航 */
+    .q-nav {
+        display: flex; gap: 8px; justify-content: space-between; margin-top: 16px;
+        padding-top: 14px; border-top: 1px dashed #e0e0e0; flex-wrap: wrap;
+    }
+    .q-nav button {
+        padding: 8px 16px; border: none; border-radius: 8px;
+        background: #5e35b1; color: #fff; font-weight: bold; font-size: 13px;
+        cursor: pointer; font-family: inherit; transition: background 0.2s;
+    }
+    .q-nav button:hover { background: #4a2b91; }
+    .q-nav .btn-fav.on { background: #ff8f00; }
+    .q-nav .btn-fav.on:hover { background: #e65100; }
+
+    /* 题号网格（考试模式快速跳转） */
+    .q-grid {
+        display: grid; grid-template-columns: repeat(15, 1fr); gap: 4px;
+        margin: 10px 0; max-width: 100%;
+    }
+    @media (max-width: 600px) { .q-grid { grid-template-columns: repeat(10, 1fr); } }
+    .q-grid-cell {
+        aspect-ratio: 1; border: 1px solid #ccc; border-radius: 4px;
+        font-size: 11px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; background: #fff; color: #666;
+        transition: all 0.15s;
+    }
+    .q-grid-cell:hover { background: #ede7f6; }
+    .q-grid-cell.answered { background: #c8e6c9; border-color: #66bb6a; color: #2e7d32; }
+    .q-grid-cell.current { border: 2px solid #5e35b1; font-weight: bold; }
+    .q-grid-cell.marked { background: #ffe0b2; border-color: #ff8f00; }
+
+    /* 空状态 */
+    .empty-state {
+        text-align: center; padding: 50px 20px; color: #888;
+    }
+    .empty-state .icon { font-size: 56px; margin-bottom: 12px; }
+
+    /* 规则面板 */
+    .rules-panel { width: 100%; max-width: 720px; margin-top: 14px; }
+    .rules-panel details {
+        background: #fff; border: 2px solid #d1c4e9; border-radius: 14px; overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .rules-panel summary {
+        list-style: none; cursor: pointer; padding: 12px 16px;
+        background: linear-gradient(135deg, #5e35b1, #7986cb); color: #fff;
+        font-weight: bold; font-size: 15px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .rules-panel summary::-webkit-details-marker { display: none; }
+    .rules-panel summary .arrow { transition: transform 0.3s; font-size: 12px; opacity: 0.8; }
+    .rules-panel details[open] summary .arrow { transform: rotate(180deg); }
+    .panel-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rule-item {
+        display: flex; gap: 10px; align-items: flex-start; background: #f3e5f5;
+        border: 1px solid #e1bee7; border-radius: 10px; padding: 9px 10px;
+        font-size: 13px; line-height: 1.5; color: #4a148c;
+    }
+    .rule-icon { font-size: 20px; background: #ede7f6; border-radius: 8px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rule-item b { color: #5e35b1; }
+
+    /* 结果弹窗 */
+    .result-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .result-modal.show { display: flex; }
+    .result-card { background: #fff; padding: 30px 40px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: pop 0.4s ease; max-width: 90vw; }
+    @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .result-card h2 { font-size: 24px; color: #5e35b1; margin-bottom: 12px; }
+    .result-card p { color: #455a64; font-size: 15px; margin-bottom: 6px; }
+    .result-card .score { font-size: 32px; font-weight: bold; color: #43a047; margin: 8px 0; }
+    .result-card .score.low { color: #e53935; }
+    .result-card button { padding: 10px 20px; border: none; border-radius: 10px; background: #5e35b1; color: #fff; font-size: 14px; font-weight: bold; cursor: pointer; margin: 6px 4px 0; }
+    .result-card button:hover { background: #4a2b91; }
+    .result-card .btn-close { background: #aaa; }
+    .result-card .btn-close:hover { background: #888; }
+
+    /* Toast */
+    .toast {
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+        background: #5e35b1; color: #fff; padding: 10px 20px; border-radius: 10px;
+        font-size: 14px; z-index: 200; opacity: 0; pointer-events: none; transition: all 0.3s;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { background: #e53935; }
+    .toast.ok { background: #43a047; }
+    .toast.warn { background: #ff8f00; }
+</style>
+</head>
+<body>
+<h1>📚 软件设计师答题通 📚</h1>
+
+<div class="mode-grid" id="mode-grid">
+    <button class="mode-card on" data-mode="practice">
+        <div class="mc-icon">📖</div><div class="mc-name">练习模式</div><div class="mc-best" id="best-practice">—</div>
+    </button>
+    <button class="mode-card" data-mode="exam">
+        <div class="mc-icon">⏰</div><div class="mc-name">模拟考试</div><div class="mc-best" id="best-exam">—</div>
+    </button>
+    <button class="mode-card" data-mode="wrongbook">
+        <div class="mc-icon">📌</div><div class="mc-name">错题本</div><div class="mc-best" id="best-wrongbook">—</div>
+    </button>
+</div>
+
+<div class="config-bar" id="config-bar"></div>
+
+<div class="quiz-stage" id="stage">
+    <div class="empty-state"><div class="icon">📚</div><div>选择模式开始答题</div></div>
+</div>
+
+<div class="rules-panel">
+    <details open>
+        <summary><span>📖 答题规则</span><span class="arrow">▼</span></summary>
+        <div class="panel-body">
+            <div class="rule-item"><span class="rule-icon">📖</span><div><b>练习模式：</b>选题型按顺序或随机做题，每题即时显示答案解析，做错自动入错题本！</div></div>
+            <div class="rule-item"><span class="rule-icon">⏰</span><div><b>模拟考试：</b>随机抽 75 题综合知识，90 分钟倒计时，交卷才看答案，得分 45 及格！</div></div>
+            <div class="rule-item"><span class="rule-icon">📌</span><div><b>错题本：</b>只看做错的题和收藏的题，重做答对后自动移出错题本！</div></div>
+            <div class="rule-item"><span class="rule-icon">📚</span><div><b>题型：</b>综合知识（单选）、软件设计分析（多空选择）、程序设计（代码填空）、应用技术（设计填空）</div></div>
+            <div class="rule-item"><span class="rule-icon">💾</span><div><b>数据：</b>错题、收藏、历史成绩自动保存在本地浏览器，不依赖网络！</div></div>
+        </div>
+    </details>
+</div>
+
+<div class="result-modal" id="result-modal">
+    <div class="result-card">
+        <h2 id="result-title">🎉 交卷完成</h2>
+        <div class="score" id="result-score">0 / 75</div>
+        <p id="result-time"></p>
+        <p id="result-wrong"></p>
+        <p id="result-tip"></p>
+        <button onclick="viewWrongBook()">📌 查看错题</button>
+        <button class="btn-close" onclick="closeResult()">✕ 关闭</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ================= 题库 =================
+const QUESTIONS = [
+    // ---------- 综合知识 ----------
+    { id: 'c1', type: 'comprehensive', tag: '软件工程', stem: '在软件开发模型中，要求软件开发过程严格按照顺序进行，每个阶段完成后才进入下一阶段的模型是？',
+      blanks: [{ label: '(1)', options: ['瀑布模型', '螺旋模型', '敏捷模型', '迭代模型'], answer: 0, explain: '瀑布模型强调阶段顺序和线性流程，每个阶段完成后才进入下一阶段。' }] },
+    { id: 'c2', type: 'comprehensive', tag: '软件工程', stem: '软件测试中，发现错误越晚，修复成本如何变化？',
+      blanks: [{ label: '(1)', options: ['越低', '越高', '不变', '与时间无关'], answer: 1, explain: '错误发现越晚，修复成本越高，呈指数级增长。' }] },
+    { id: 'c3', type: 'comprehensive', tag: '数据结构', stem: '下列排序算法中，平均时间复杂度为 O(n log n) 的是？',
+      blanks: [{ label: '(1)', options: ['冒泡排序', '快速排序', '插入排序', '选择排序'], answer: 1, explain: '快速排序平均时间复杂度 O(n log n)，最坏 O(n²)。' }] },
+    { id: 'c4', type: 'comprehensive', tag: '数据结构', stem: '一个栈的输入序列是 1,2,3,4,5，下列哪个序列不可能成为出栈序列？',
+      blanks: [{ label: '(1)', options: ['5,4,3,2,1', '2,3,4,1,5', '1,2,3,4,5', '3,1,2,4,5'], answer: 3, explain: '3 出栈后 1,2 已在栈中，2 在 1 上，不可能先出 1 再出 2。' }] },
+    { id: 'c5', type: 'comprehensive', tag: '操作系统', stem: '进程状态转换中，下列哪种转换不可能直接发生？',
+      blanks: [{ label: '(1)', options: ['就绪→运行', '运行→阻塞', '阻塞→运行', '运行→就绪'], answer: 2, explain: '阻塞状态必须先转为就绪，由调度再转为运行，不能直接转运行。' }] },
+    { id: 'c6', type: 'comprehensive', tag: '操作系统', stem: '虚拟存储器的最大容量受什么限制？',
+      blanks: [{ label: '(1)', options: ['内存大小', '磁盘大小', 'CPU 地址位数', '内外存之和'], answer: 2, explain: '虚拟存储器最大容量由 CPU 地址结构（地址位数）决定。' }] },
+    { id: 'c7', type: 'comprehensive', tag: '计算机网络', stem: 'TCP 三次握手中，第二次握手报文的标志位组合是？',
+      blanks: [{ label: '(1)', options: ['SYN=1, ACK=0', 'SYN=1, ACK=1', 'SYN=0, ACK=1', 'FIN=1, ACK=1'], answer: 1, explain: '第二次握手报文 SYN=1, ACK=1，表示同意建立连接并确认请求。' }] },
+    { id: 'c8', type: 'comprehensive', tag: '计算机网络', stem: '下列哪个 IP 地址属于 B 类地址？',
+      blanks: [{ label: '(1)', options: ['10.0.0.1', '128.1.0.1', '192.168.1.1', '224.0.0.1'], answer: 1, explain: 'B 类地址范围 128.0.0.0 ~ 191.255.255.255。' }] },
+    { id: 'c9', type: 'comprehensive', tag: '数据库', stem: 'SQL 中删除表中所有数据但保留表结构的命令是？',
+      blanks: [{ label: '(1)', options: ['DROP TABLE', 'DELETE FROM', 'TRUNCATE TABLE', 'ALTER TABLE'], answer: 2, explain: 'TRUNCATE 删除所有数据但保留表结构，比 DELETE 快且不写日志。' }] },
+    { id: 'c10', type: 'comprehensive', tag: '数据库', stem: '关系数据库中，下列哪种范式要求消除非主属性对候选键的部分依赖？',
+      blanks: [{ label: '(1)', options: ['1NF', '2NF', '3NF', 'BCNF'], answer: 1, explain: '2NF 在 1NF 基础上消除非主属性对候选键的部分函数依赖。' }] },
+    { id: 'c11', type: 'comprehensive', tag: '面向对象', stem: '面向对象中，子类对象替代父类对象在程序中出现的规则称为？',
+      blanks: [{ label: '(1)', options: ['封装', '继承', '多态', '里氏替换原则'], answer: 3, explain: '里氏替换原则 LSP：所有引用父类的地方必须能透明地使用子类对象。' }] },
+    { id: 'c12', type: 'comprehensive', tag: '设计模式', stem: '单例模式保证一个类只有一个实例，并提供一个全局访问点。下列哪个是其关键实现要点？',
+      blanks: [{ label: '(1)', options: ['构造函数公开', '构造函数私有', '使用接口', '多继承'], answer: 1, explain: '单例模式构造函数私有，防止外部直接 new，通过静态方法获取唯一实例。' }] },
+    { id: 'c13', type: 'comprehensive', tag: '设计模式', stem: '观察者模式中，被观察对象状态变化时，观察者如何得到通知？',
+      blanks: [{ label: '(1)', options: ['观察者主动轮询', '被观察者主动调用观察者的更新方法', '通过共享内存', '观察者互相通知'], answer: 1, explain: '观察者模式通过 Subject 主动 notify 观察者的 update 方法实现。' }] },
+    { id: 'c14', type: 'comprehensive', tag: '软件工程', stem: '软件维护中占比最大的维护类型是？',
+      blanks: [{ label: '(1)', options: ['改正性维护', '适应性维护', '完善性维护', '预防性维护'], answer: 2, explain: '完善性维护（增加新功能、改善性能）占比约 50%-66%。' }] },
+    { id: 'c15', type: 'comprehensive', tag: '软件工程', stem: ' McCabe 度量法用于计算程序复杂度，对一个有 20 条边、15 个节点、1 个连通分量的程序，其环形复杂度 V(G) 是？',
+      blanks: [{ label: '(1)', options: ['5', '6', '7', '8'], answer: 2, explain: 'V(G) = E - N + 2 = 20 - 15 + 2 = 7。' }] },
+    { id: 'c16', type: 'comprehensive', tag: '数据结构', stem: '完全二叉树有 1000 个节点，其叶子节点数是？',
+      blanks: [{ label: '(1)', options: ['500', '499', '501', '498'], answer: 0, explain: 'n=1000 时，叶子节点数 = ⌈n/2⌉ = 500。' }] },
+    { id: 'c17', type: 'comprehensive', tag: '数据结构', stem: '下列关于哈希表处理冲突的方法中，开放定址法指的是？',
+      blanks: [{ label: '(1)', options: ['链地址法', '线性探测法', '再哈希法', '建立公共溢出区'], answer: 1, explain: '开放定址法包含线性探测、二次探测等，遇冲突时寻找下一个空位。' }] },
+    { id: 'c18', type: 'comprehensive', tag: '操作系统', stem: '下列页面置换算法中，可能产生 Belady 异常的是？',
+      blanks: [{ label: '(1)', options: ['LRU', 'OPT', 'FIFO', 'LFU'], answer: 2, explain: 'FIFO 可能产生 Belady 异常（增加页框反而缺页增多）。' }] },
+    { id: 'c19', type: 'comprehensive', tag: '操作系统', stem: ' PV 操作中，信号量初值为 5，经过 P1、P2、V1、P3 操作后，信号量值为？',
+      blanks: [{ label: '(1)', options: ['2', '3', '4', '6'], answer: 1, explain: '5 -1 -1 +1 -1 = 3。' }] },
+    { id: 'c20', type: 'comprehensive', tag: '计算机网络', stem: ' OSI 参考模型中，负责数据加密解密的是哪一层？',
+      blanks: [{ label: '(1)', options: ['物理层', '数据链路层', '表示层', '会话层'], answer: 2, explain: '表示层处理数据格式、加密解密、压缩等。' }] },
+    { id: 'c21', type: 'comprehensive', tag: '数据库', stem: '数据库事务的 ACID 特性中，"I" 指的是？',
+      blanks: [{ label: '(1)', options: ['原子性 Atomicity', '一致性 Consistency', '隔离性 Isolation', '持久性 Durability'], answer: 2, explain: 'ACID = 原子性、一致性、隔离性 Isolation、持久性。' }] },
+    { id: 'c22', type: 'comprehensive', tag: '面向对象', stem: 'UML 类图中，表示类之间 "is-a" 关系的连线是？',
+      blanks: [{ label: '(1)', options: ['关联（实线）', '泛化（带空心三角箭头实线）', '依赖（虚线）', '聚合（带空心菱形实线）'], answer: 1, explain: '泛化 Generalization 表示继承关系，空心三角箭头。' }] },
+    { id: 'c23', type: 'comprehensive', tag: '软件工程', stem: '下列哪项不属于软件配置项 SCI？',
+      blanks: [{ label: '(1)', options: ['源代码', '需求文档', '测试用例', '开发人员名单'], answer: 3, explain: '开发人员名单不是配置项，配置项是过程中产生的制品。' }] },
+    { id: 'c24', type: 'comprehensive', tag: '数据结构', stem: '一棵哈夫曼树有 n 个叶子节点，则其总节点数为？',
+      blanks: [{ label: '(1)', options: ['2n', '2n-1', '2n+1', 'n+1'], answer: 1, explain: '哈夫曼树不存在度为 1 的节点，总节点数 = 2n-1。' }] },
+    { id: 'c25', type: 'comprehensive', tag: '知识产权', stem: '我国《著作权法》中，公民作品的发表权保护期是？',
+      blanks: [{ label: '(1)', options: ['作者终生及死后 50 年', '50 年', '作者终生', '永久保护'], answer: 0, explain: '公民作品发表权保护期为作者终生及死后 50 年。' }] },
+    { id: 'c26', type: 'comprehensive', tag: '软件工程', stem: '敏捷开发中，下列哪个不是其核心价值观？',
+      blanks: [{ label: '(1)', options: ['个体和互动高于流程和工具', '工作软件高于详尽文档', '响应变化高于遵循计划', '完整文档高于代码'], answer: 3, explain: '敏捷宣言 4 项价值观之一是"工作软件高于详尽文档"，不是"完整文档高于代码"。' }] },
+    { id: 'c27', type: 'comprehensive', tag: '数据结构', stem: '下列数据结构中，属于非线性结构的是？',
+      blanks: [{ label: '(1)', options: ['栈', '队列', '树', '链表'], answer: 2, explain: '树是非线性结构，栈/队列/链表是线性结构。' }] },
+    { id: 'c28', type: 'comprehensive', tag: '操作系统', stem: '产生死锁的四个必要条件中，不包括下列哪个？',
+      blanks: [{ label: '(1)', options: ['互斥', '请求与保持', '抢占', '循环等待'], answer: 2, explain: '死锁四必要条件：互斥、请求与保持、不剥夺（非抢占）、循环等待。' }] },
+    { id: 'c29', type: 'comprehensive', tag: '计算机网络', stem: '下列协议中，工作在传输层的是？',
+      blanks: [{ label: '(1)', options: ['IP', 'TCP', 'HTTP', 'ARP'], answer: 1, explain: 'TCP/UDP 工作在传输层，IP/ARP 在网络层，HTTP 在应用层。' }] },
+    { id: 'c30', type: 'comprehensive', tag: '数据库', stem: 'SQL 中，下列哪个子句用于对查询结果分组后过滤？',
+      blanks: [{ label: '(1)', options: ['WHERE', 'GROUP BY', 'HAVING', 'ORDER BY'], answer: 2, explain: 'HAVING 用于过滤 GROUP BY 后的分组，WHERE 在分组前过滤行。' }] },
+
+    // ---------- 软件设计分析 ----------
+    { id: 'd1', type: 'design', tag: '用例图', stem: '某在线书店系统需要设计用例图。根据需求：顾客可浏览图书、加入购物车、下单；管理员可管理图书、查看订单。阅读以下描述并填空：\n\n用例图中，"顾客"和"管理员"都属于【(1)】；"浏览图书"、"加入购物车"属于【(2)】；顾客与管理员之间可以建立【(3)】关系，复用其账号权限。',
+      blanks: [
+        { label: '(1)', options: ['参与者 Actor', '用例 Use Case', '边界类', '控制类'], answer: 0, explain: '参与者是与系统交互的外部实体，顾客和管理员都是。' },
+        { label: '(2)', options: ['参与者', '用例', '系统边界', '接口'], answer: 1, explain: '用例是系统提供的功能单元。' },
+        { label: '(3)', options: ['泛化', '包含 include', '扩展 extend', '关联'], answer: 0, explain: '管理员可继承顾客的部分行为，属于泛化（继承）关系。' },
+      ]
+    },
+    { id: 'd2', type: 'design', tag: '类图', stem: '设计一个图书馆管理系统类图，包含类 Book、Reader、Loan。根据关系描述填空：\n\n一个 Reader 可同时借多本 Book，对应 Loan 记录；Reader 与 Loan 之间是【(1)】关系；Book 与 Loan 之间是【(2)】关系；Loan 类中应包含借阅日期等属性，属于【(3)】类。',
+      blanks: [
+        { label: '(1)', options: ['一对一 1..1', '一对多 1..*', '多对多 *..*', '无关系'], answer: 1, explain: '一个读者可有多条借阅记录，1..*。' },
+        { label: '(2)', options: ['一对一', '一对多', '多对一', '多对多'], answer: 1, explain: '一本书历史上有多次借阅，1..*。' },
+        { label: '(3)', options: ['实体类', '控制类', '边界类', '接口类'], answer: 0, explain: 'Loan 是持久存储的实体信息，属于实体类。' },
+      ]
+    },
+    { id: 'd3', type: 'design', tag: '状态图', stem: '某订单的状态转换：新建→已支付→已发货→已完成。其中已支付状态可因取消操作回到"已取消"终态。根据描述填空：\n\n"已支付"到"已发货"的转换触发条件是【(1)】；"已支付"到"已取消"的转换触发条件是【(2)】；状态图中"已完成"和"已取消"都属于【(3)】状态。',
+      blanks: [
+        { label: '(1)', options: ['管理员发货', '用户付款', '用户取消订单', '订单超时'], answer: 0, explain: '发货是已支付→已发货的触发事件。' },
+        { label: '(2)', options: ['用户付款', '用户取消订单', '管理员发货', '订单完成'], answer: 1, explain: '取消订单是触发到"已取消"的事件。' },
+        { label: '(3)', options: ['初始', '中间', '终止 final', '历史'], answer: 2, explain: '完成和取消都是状态机的终态。' },
+      ]
+    },
+
+    // ---------- 程序设计 ----------
+    { id: 'p1', type: 'program', tag: '链表', stem: '以下 C 代码实现单链表反转，请在空缺处填入正确代码：\n\n```c\nstruct Node* reverse(struct Node* head) {\n    struct Node *prev = NULL, *curr = head, *next;\n    while (curr != NULL) {\n        next = curr->next;\n        // (1) 反转指针\n        curr->next = ____?____;\n        // (2) 前进\n        prev = ____?____;\n        curr = next;\n    }\n    // (3) 返回新头\n    return ____?____;\n}\n```',
+      blanks: [
+        { label: '(1) curr->next = ', options: ['prev', 'next', 'curr', 'head'], answer: 0, explain: '反转指针指向前一个节点 prev。' },
+        { label: '(2) prev = ', options: ['next', 'curr', 'prev', 'head'], answer: 1, explain: 'prev 前进到当前 curr。' },
+        { label: '(3) return ', options: ['head', 'curr', 'prev', 'next'], answer: 2, explain: '循环结束时 prev 指向新链表头。' },
+      ]
+    },
+    { id: 'p2', type: 'program', tag: '递归', stem: '以下代码实现斐波那契数列递归，请填空：\n\n```c\nint fib(int n) {\n    if (n <= 1) return ____?____;  // (1)\n    return fib(n-1) + ____?____;   // (2)\n}\n// 时间复杂度为 O(____?____)  // (3)\n```',
+      blanks: [
+        { label: '(1) return', options: ['n', '1', '0', 'n-1'], answer: 0, explain: 'fib(0)=0, fib(1)=1，n<=1 时返回 n。' },
+        { label: '(2) fib(n-1) + ', options: ['fib(n-2)', 'fib(n+1)', 'fib(n)', 'n'], answer: 0, explain: '递推公式 fib(n) = fib(n-1) + fib(n-2)。' },
+        { label: '(3) 时间复杂度 O(?)', options: ['n', 'n²', '2^n', 'log n'], answer: 2, explain: '递归调用呈指数增长，复杂度约 O(2^n)。' },
+      ]
+    },
+    { id: 'p3', type: 'program', tag: '二分查找', stem: '以下代码实现二分查找，请填空：\n\n```c\nint bsearch(int arr[], int n, int target) {\n    int left = 0, right = ____?____;  // (1)\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (arr[mid] == target) return mid;\n        else if (arr[mid] < target) left = ____?____;  // (2)\n        else right = ____?____;                       // (3)\n    }\n    return -1;\n}\n```',
+      blanks: [
+        { label: '(1) right =', options: ['n', 'n-1', '0', 'n/2'], answer: 1, explain: '闭区间 [0, n-1]，right 初值为 n-1。' },
+        { label: '(2) left =', options: ['mid', 'mid-1', 'mid+1', 'right'], answer: 2, explain: 'target 在右侧，left 前进到 mid+1。' },
+        { label: '(3) right =', options: ['mid', 'mid+1', 'mid-1', 'left'], answer: 2, explain: 'target 在左侧，right 退到 mid-1。' },
+      ]
+    },
+
+    // ---------- 应用技术 ----------
+    { id: 'a1', type: 'application', tag: '数据流图', stem: '某订单系统数据流图：顾客提交订单→【验证订单】→【库存查询】→【生成发货单】→仓库。其中"顾客订单"是【(1)】，"验证订单"是【(2)】，"发货单"是【(3)】。',
+      blanks: [
+        { label: '(1)', options: ['外部实体', '加工', '数据流', '数据存储'], answer: 2, explain: '订单信息流是数据流。' },
+        { label: '(2)', options: ['外部实体', '加工 Process', '数据存储', '数据源'], answer: 1, explain: '验证订单是处理逻辑，即加工。' },
+        { label: '(3)', options: ['外部实体', '加工', '数据流', '数据存储'], answer: 2, explain: '发货单作为输出信息流，是数据流。' },
+      ]
+    },
+    { id: 'a2', type: 'application', tag: 'ER 图', stem: '设计学生选课系统 ER 图：学生(学号,姓名) 选课 → 课程(课程号,课程名)。一个学生可选多门课，一门课可被多个学生选。"选课"作为联系类型，其基数是【(1)】，"选课"联系上可以挂属性如成绩，这种属性称为【(2)】；将 ER 图转关系模式时，"选课"应转为独立关系模式，其主键由【(3)】构成。',
+      blanks: [
+        { label: '(1)', options: ['1:1', '1:N', 'M:N', '无'], answer: 2, explain: '多对多关系 M:N。' },
+        { label: '(2)', options: ['实体属性', '联系属性', '主属性', '候选属性'], answer: 1, explain: '挂在多对多联系上的属性是联系属性。' },
+        { label: '(3)', options: ['学生主键', '课程主键', '学生+课程主键', '成绩'], answer: 2, explain: 'M:N 联系转关系模式时主键是两端实体主键的组合。' },
+      ]
+    },
+];
+
+// ================= 状态 =================
+let store = { wrongBook: [], favorites: [], history: [] };
+let currentMode = 'practice';
+let currentType = 'comprehensive';
+let currentOrder = 'seq';          // seq | random
+let currentList = [];              // 当前答题题目列表
+let currentIndex = 0;
+let userAnswers = {};              // { qid: [selectedIdx per blank] }
+let examState = null;              // 考试模式状态
+
+// ================= 工具 =================
+const $ = id => document.getElementById(id);
+
+function toast(msg, type = '') {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(t._tm);
+    t._tm = setTimeout(() => t.className = 'toast', 2000);
+}
+
+function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function fmtTime(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+// ================= localStorage =================
+function loadStore() {
+    try {
+        const s = JSON.parse(localStorage.getItem('sd_quiz') || '{}');
+        store.wrongBook = s.wrongBook || [];
+        store.favorites = s.favorites || [];
+        store.history = s.history || [];
+    } catch (e) {}
+}
+function saveStore() { localStorage.setItem('sd_quiz', JSON.stringify(store)); }
+function isWrong(qid) { return store.wrongBook.includes(qid); }
+function addWrong(qid) { if (!isWrong(qid)) { store.wrongBook.push(qid); saveStore(); } }
+function removeWrong(qid) {
+    store.wrongBook = store.wrongBook.filter(x => x !== qid);
+    saveStore();
+}
+function isFav(qid) { return store.favorites.includes(qid); }
+function toggleFav(qid) {
+    if (isFav(qid)) store.favorites = store.favorites.filter(x => x !== qid);
+    else store.favorites.push(qid);
+    saveStore();
+}
+
+function renderBest() {
+    // 显示历史最佳
+    const practiceHistory = store.history.filter(h => h.mode === 'practice' && h.type === currentType);
+    $('best-practice').textContent = practiceHistory.length ? `已做 ${practiceHistory.length} 次` : '—';
+    const examHistory = store.history.filter(h => h.mode === 'exam');
+    if (examHistory.length) {
+        const best = Math.max(...examHistory.map(h => h.score));
+        $('best-exam').textContent = `🏆 ${best}/75`;
+    } else $('best-exam').textContent = '—';
+    $('best-wrongbook').textContent = `${store.wrongBook.length} 题`;
+}
+
+// ================= 配置栏 =================
+function renderConfig() {
+    const bar = $('config-bar');
+    if (currentMode === 'practice') {
+        bar.innerHTML = `
+            <span>题型</span>
+            <select id="type-select" onchange="changeType(this.value)">
+                <option value="comprehensive" ${currentType==='comprehensive'?'selected':''}>📚 综合知识 (${QUESTIONS.filter(q=>q.type==='comprehensive').length}题)</option>
+                <option value="design" ${currentType==='design'?'selected':''}>🔍 设计分析 (${QUESTIONS.filter(q=>q.type==='design').length}题)</option>
+                <option value="program" ${currentType==='program'?'selected':''}>💻 程序设计 (${QUESTIONS.filter(q=>q.type==='program').length}题)</option>
+                <option value="application" ${currentType==='application'?'selected':''}>📐 应用技术 (${QUESTIONS.filter(q=>q.type==='application').length}题)</option>
+            </select>
+            <span class="divider">|</span>
+            <span>顺序</span>
+            <select id="order-select" onchange="changeOrder(this.value)">
+                <option value="seq" ${currentOrder==='seq'?'selected':''}>顺序</option>
+                <option value="random" ${currentOrder==='random'?'selected':''}>随机</option>
+            </select>
+            <button onclick="startPractice()">▶ 开始</button>
+        `;
+    } else if (currentMode === 'exam') {
+        bar.innerHTML = `
+            <span class="info">75 题综合知识 · 90 分钟 · 45 分及格</span>
+            <span class="divider">|</span>
+            <button onclick="startExam()">▶ 开始考试</button>
+            <button class="btn-back" onclick="selectMode('practice')">↩ 返回</button>
+        `;
+    } else if (currentMode === 'wrongbook') {
+        const wrongIds = store.wrongBook;
+        const favIds = store.favorites;
+        bar.innerHTML = `
+            <span class="info">📌 错题 ${wrongIds.length} 题 · ⭐ 收藏 ${favIds.length} 题</span>
+            <span class="divider">|</span>
+            <select id="wb-filter" onchange="changeWbFilter(this.value)">
+                <option value="wrong">错题</option>
+                <option value="fav">收藏</option>
+                <option value="all">全部</option>
+            </select>
+            <button onclick="startWrongBook()">▶ 开始练习</button>
+            <button class="btn-back" onclick="selectMode('practice')">↩ 返回</button>
+        `;
+    }
+}
+
+// ================= 模式选择 =================
+function selectMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-card').forEach(c =>
+        c.classList.toggle('on', c.dataset.mode === mode));
+    if (mode === 'practice') currentType = currentType || 'comprehensive';
+    renderConfig();
+    renderBest();
+    $('stage').innerHTML = '<div class="empty-state"><div class="icon">📚</div><div>点上方「开始」按钮</div></div>';
+}
+
+function changeType(val) { currentType = val; }
+function changeOrder(val) { currentOrder = val; }
+function changeWbFilter(val) {}
+
+// ================= 练习模式 =================
+function startPractice() {
+    let list = QUESTIONS.filter(q => q.type === currentType);
+    if (currentOrder === 'random') list = shuffle(list);
+    currentList = list;
+    currentIndex = 0;
+    userAnswers = {};
+    renderQuestion();
+}
+
+// ================= 模拟考试模式 =================
+function startExam() {
+    const compPool = QUESTIONS.filter(q => q.type === 'comprehensive');
+    // 75 题随机抽取（题库不足则重复补足）
+    let picked = shuffle(compPool);
+    while (picked.length < 75) picked = picked.concat(shuffle(compPool));
+    currentList = picked.slice(0, 75);
+    currentIndex = 0;
+    userAnswers = {};
+    examState = { startTime: Date.now(), remain: 90 * 60, submitted: false };
+    renderQuestion();
+    startExamTimer();
+}
+
+let examTimer = null;
+function startExamTimer() {
+    if (examTimer) clearInterval(examTimer);
+    examTimer = setInterval(() => {
+        if (!examState || examState.submitted) return;
+        examState.remain--;
+        updateTimerText();
+        if (examState.remain <= 0) {
+            submitExam();
+        }
+    }, 1000);
+}
+function updateTimerText() {
+    const el = $('timer');
+    if (!el || !examState) return;
+    el.textContent = '⏰ ' + fmtTime(examState.remain);
+    if (examState.remain <= 300) el.classList.add('warn');
+    else el.classList.remove('warn');
+}
+
+function submitExam() {
+    if (!examState) return;
+    examState.submitted = true;
+    clearInterval(examTimer);
+    // 评分
+    let correct = 0;
+    const wrongIds = [];
+    currentList.forEach((q, i) => {
+        const ua = userAnswers[q.id] || [];
+        const allCorrect = q.blanks.every((b, idx) => ua[idx] === b.answer);
+        if (allCorrect) correct++;
+        else wrongIds.push(q.id);
+    });
+    // 错题入库
+    wrongIds.forEach(id => addWrong(id));
+    // 历史
+    const usedTime = Math.floor((Date.now() - examState.startTime) / 1000);
+    store.history.push({ mode: 'exam', score: correct, total: currentList.length, time: usedTime, date: Date.now() });
+    store.history = store.history.slice(-20);
+    saveStore();
+    renderBest();
+    // 结果弹窗
+    $('result-title').textContent = correct >= 45 ? '🎉 考试通过！' : '😢 继续加油';
+    const scoreEl = $('result-score');
+    scoreEl.textContent = `${correct} / ${currentList.length}`;
+    scoreEl.className = 'score' + (correct >= 45 ? '' : ' low');
+    $('result-time').textContent = `用时 ${fmtTime(usedTime)}`;
+    $('result-wrong').textContent = `错题 ${currentList.length - correct} 题（已加入错题本）`;
+    $('result-tip').textContent = correct >= 45 ? '🎉 恭喜达到及格线！' : '💡 错题可去错题本模式重做';
+    $('result-modal').classList.add('show');
+}
+
+// ================= 错题本模式 =================
+function startWrongBook() {
+    const filter = $('wb-filter') ? $('wb-filter').value : 'wrong';
+    let ids = [];
+    if (filter === 'wrong') ids = store.wrongBook;
+    else if (filter === 'fav') ids = store.favorites;
+    else ids = [...new Set([...store.wrongBook, ...store.favorites])];
+    let list = ids.map(id => QUESTIONS.find(q => q.id === id)).filter(q => q);
+    list = shuffle(list);
+    if (!list.length) {
+        toast('没有错题或收藏题', 'warn');
+        $('stage').innerHTML = '<div class="empty-state"><div class="icon">🎉</div><div>没有错题，去做一些题吧！</div></div>';
+        return;
+    }
+    currentList = list;
+    currentIndex = 0;
+    userAnswers = {};
+    renderQuestion();
+}
+
+function viewWrongBook() {
+    closeResult();
+    selectMode('wrongbook');
+    startWrongBook();
+}
+
+// ================= 渲染题目 =================
+function renderQuestion() {
+    if (!currentList.length) {
+        $('stage').innerHTML = '<div class="empty-state"><div class="icon">📚</div><div>暂无题目</div></div>';
+        return;
+    }
+    const q = currentList[currentIndex];
+    const ua = userAnswers[q.id] || [];
+    const isPractice = currentMode === 'practice';
+    const isWrongBook = currentMode === 'wrongbook';
+    // 判断是否已答（所有空都选了）
+    const answered = ua.filter(x => x !== undefined && x !== null).length;
+    const allAnswered = answered === q.blanks.length;
+    // 判定对错（练习/错题本模式即时显示）
+    const showResult = isPractice || isWrongBook ? allAnswered : false;
+    const allCorrect = showResult ? q.blanks.every((b, i) => ua[i] === b.answer) : false;
+    const someWrong = showResult ? !allCorrect : false;
+
+    const typeLabel = {
+        comprehensive: '📚 综合知识', design: '🔍 设计分析',
+        program: '💻 程序设计', application: '📐 应用技术'
+    }[q.type];
+
+    const stemHtml = q.stem.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    let blanksHtml = q.blanks.map((b, i) => {
+        const sel = ua[i];
+        let optionsHtml = b.options.map((opt, oi) => {
+            let cls = 'option-btn';
+            if (showResult) {
+                if (oi === b.answer) cls += ' correct-option';
+                if (oi === sel && oi !== b.answer) cls += ' wrong-option';
+            } else if (oi === sel) cls += ' selected';
+            const disabled = showResult ? 'disabled' : '';
+            return `<button class="${cls}" ${disabled} onclick="selectOption(${i}, ${oi})">${String.fromCharCode(65+oi)}. ${opt}</button>`;
+        }).join('');
+        let bcls = 'blank';
+        if (showResult) {
+            if (sel === b.answer) bcls += ' correct';
+            else bcls += ' wrong';
+        }
+        return `<div class="${bcls}"><div class="blank-label">${b.label}</div>${optionsHtml}</div>`;
+    }).join('');
+
+    const explainHtml = (showResult && (someWrong || allCorrect)) ? `
+        <div class="q-explain">
+            <b>💡 解析：</b>
+            ${q.blanks.map((b, i) => `<div>${b.label} 正确答案：<b>${String.fromCharCode(65+b.answer)}. ${b.options[b.answer]}</b> ${b.explain ? '— ' + b.explain : ''}</div>`).join('')}
+            ${allCorrect ? '<div style="color:#43a047;margin-top:6px">✅ 全部答对！</div>' : ''}
+            ${someWrong && isWrongBook ? '<div style="color:#e53935;margin-top:6px">❌ 仍有错误，本题保留在错题本</div>' : ''}
+            ${someWrong && isWrongBook && allCorrect ? '' : ''}
+        </div>
+    ` : '';
+
+    // 错题本答对自动移除
+    if (isWrongBook && showResult && allCorrect) {
+        if (isWrong(q.id)) {
+            removeWrong(q.id);
+            renderBest();
+            toast('🎉 答对，已移出错题本', 'ok');
+        }
+    }
+    if (isPractice && showResult && someWrong) {
+        addWrong(q.id);
+        renderBest();
+    }
+
+    // 考试模式题号网格
+    let gridHtml = '';
+    if (currentMode === 'exam') {
+        gridHtml = '<div class="q-grid">' + currentList.map((qq, i) => {
+            const a = userAnswers[qq.id] || [];
+            const ans = a.filter(x => x !== undefined).length === qq.blanks.length;
+            let cls = 'q-grid-cell';
+            if (ans) cls += ' answered';
+            if (i === currentIndex) cls += ' current';
+            return `<div class="${cls}" onclick="jumpTo(${i})">${i+1}</div>`;
+        }).join('') + '</div>';
+    }
+
+    $('stage').innerHTML = `
+        <div class="q-progress">
+            <span>第 ${currentIndex+1} / ${currentList.length} 题 · <span class="q-tag">${q.tag}</span></span>
+            ${currentMode === 'exam' ? `<span class="q-timer" id="timer">⏰ ${fmtTime(examState ? examState.remain : 0)}</span>` : ''}
+        </div>
+        ${gridHtml}
+        <div class="q-card">
+            <div class="q-type-tag">${typeLabel}</div>
+            <div class="q-stem">${stemHtml}</div>
+            ${blanksHtml}
+            ${explainHtml}
+        </div>
+        <div class="q-nav">
+            <button onclick="prevQ()" ${currentIndex===0?'disabled':''}>⬅ 上一题</button>
+            <button class="btn-fav ${isFav(q.id)?'on':''}" onclick="favQ()">${isFav(q.id)?'⭐ 已收藏':'📌 收藏'}</button>
+            ${currentMode === 'exam' ? '<button onclick="confirmSubmit()">📤 交卷</button>' : ''}
+            <button onclick="nextQ()" ${currentIndex===currentList.length-1?'disabled':''}>下一题 ➡</button>
+        </div>
+    `;
+    if (currentMode === 'exam') updateTimerText();
+}
+
+function selectOption(blankIdx, optIdx) {
+    const q = currentList[currentIndex];
+    if (!userAnswers[q.id]) userAnswers[q.id] = q.blanks.map(() => null);
+    userAnswers[q.id][blankIdx] = optIdx;
+    renderQuestion();
+}
+
+function prevQ() {
+    if (currentIndex > 0) { currentIndex--; renderQuestion(); }
+}
+function nextQ() {
+    if (currentIndex < currentList.length - 1) { currentIndex++; renderQuestion(); }
+    else if (currentMode === 'practice') {
+        // 练习模式结束记录
+        const correctCount = currentList.filter(q => {
+            const ua = userAnswers[q.id] || [];
+            return q.blanks.every((b, i) => ua[i] === b.answer);
+        }).length;
+        store.history.push({ mode: 'practice', type: currentType, correct: correctCount, total: currentList.length, date: Date.now() });
+        store.history = store.history.slice(-20);
+        saveStore();
+        renderBest();
+        toast(`🎉 完成 ${currentList.length} 题，对 ${correctCount} 题`, 'ok');
+    }
+}
+function jumpTo(i) { currentIndex = i; renderQuestion(); }
+function favQ() {
+    const q = currentList[currentIndex];
+    toggleFav(q.id);
+    renderBest();
+    renderQuestion();
+}
+function confirmSubmit() {
+    if (confirm('确认交卷？交卷后才能查看答案')) submitExam();
+}
+
+// ================= 结果弹窗 =================
+function closeResult() { $('result-modal').classList.remove('show'); }
+
+// ================= 初始化 =================
+loadStore();
+renderBest();
+document.querySelectorAll('.mode-card').forEach(c => {
+    c.onclick = () => selectMode(c.dataset.mode);
+});
+$('result-modal').addEventListener('click', e => { if (e.target === $('result-modal')) closeResult(); });
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeResult();
+    if (e.key === 'ArrowLeft') prevQ();
+    if (e.key === 'ArrowRight') nextQ();
+});
+selectMode('practice');
+</script>
+</body>
+</html>
