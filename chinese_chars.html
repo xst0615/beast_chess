@@ -204,8 +204,15 @@ const Voice = {
         window.speechSynthesis.cancel();
         // 选女声，更柔和生动（婷婷为 macOS 中文女声，优先匹配）
         const voices = window.speechSynthesis.getVoices() || [];
-        const hints = lang.startsWith('zh') ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','zh-CN','zh_CN'] : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','en-US','en_US'];
-        const v = voices.find(x => hints.some(h => (x.name||'').includes(h) || x.lang === h));
+        // 女声匹配：先按已知女声名，再按女声关键词，最后按 lang 匹配（兼容百度/QQ 等浏览器）
+        const femaleHints = lang.startsWith('zh')
+            ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','晓晓','晓秋','晓伊','晓梦','云夏','云扬','云希','云杰','Xiaoxiao','Xiaoyi','Xiaomeng','Yunyang','Yunxi','Huihui','Kangkang']
+            : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','Jenny','Aria','Jessa','Zira','Michelle','female','Female','女声'];
+        const langHints = lang.startsWith('zh') ? ['zh-CN','zh_CN','zh','cmn'] : ['en-US','en_US','en','en-GB'];
+        let v = voices.find(x => femaleHints.some(h => (x.name||'').includes(h)));
+        if(!v) v = voices.find(x => /female|女声|woman|girl/i.test(x.name||''));
+        if(!v) v = voices.find(x => femaleHints.some(h => (x.lang||'').includes(h)) || langHints.some(h => (x.lang||'').includes(h) && /female|女/i.test(x.name||'')));
+        if(!v) v = voices.find(x => langHints.some(h => (x.lang||'') === h || (x.lang||'').startsWith(h.split('-')[0])));
         const queue = [];
         if(opts.intro) queue.push({ t: opts.intro, p: 1.32, r: 1.0, gap: 220 });
         const parts = text.match(/[^。！？，；,.!?;]+[。！？，；,.!?;]?/g) || [text];
@@ -258,6 +265,54 @@ if (window.speechSynthesis) {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
+
+/* ================= 浏览器兼容检测 ================= */
+/* 适配百度浏览器等旧内核：检测能力并给降级提示 */
+const BrowserCompat = {
+    ua: navigator.userAgent,
+    // 百度浏览器 UA 含 "Baidu" 或 "BDBrowser"
+    isBaidu: /Baidu|BDBrowser|baidu/i.test(navigator.userAgent),
+    // 微信内置浏览器
+    isWeChat: /MicroMessenger/i.test(navigator.userAgent),
+    // QQ 浏览器
+    isQQ: /QQBrowser|QQ\/|MQQBrowser/i.test(navigator.userAgent),
+    // 360 浏览器
+    is360: /QIHU|360SE|360EE|360browser/i.test(navigator.userAgent),
+    // 是否旧 Chromium（版本 < 70）
+    isOldChromium: (function(){
+        const m = navigator.userAgent.match(/Chrome\/(\d+)/);
+        return m && parseInt(m[1]) < 70;
+    })(),
+    hasPointer: ('PointerEvent' in window) || ('onpointerdown' in window),
+    hasPath2D: (typeof Path2D !== 'undefined'),
+    hasSpeechSynthesis: ('speechSynthesis' in window),
+    hasSpeechRecognition: ('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window),
+    hasTouch: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
+    // 综合判定：哪些功能可用
+    features: {},
+    init(){
+        this.features.write = this.hasPointer || this.hasTouch;  // 描笔：pointer 或 touch 任一即可
+        this.features.strokeOutline = this.hasPath2D;             // 笔画轮廓需 Path2D
+        this.features.tts = this.hasSpeechSynthesis;              // 朗读
+        this.features.asr = this.hasSpeechRecognition;            // 语音识别
+        // 不支持描笔时给提示
+        if(!this.features.write){
+            console.warn('[BrowserCompat] 不支持描笔，建议用 Chrome/Safari');
+        }
+        // 旧 Chromium 提示
+        if(this.isOldChromium || this.isBaidu){
+            console.info('[BrowserCompat] 检测到旧内核浏览器，部分功能可能降级');
+        }
+    },
+    // 给按钮加禁用样式 + 提示
+    disableBtn(el, tip){
+        if(!el) return;
+        el.style.opacity = '0.4';
+        el.style.pointerEvents = 'none';
+        el.title = tip || '此浏览器不支持';
+    }
+};
+BrowserCompat.init();
 
 /* ================= 字库 40 课 100 字 ================= */
 /* 每个字：c 字, p 拼音, w[组词2], s 例句, o 笔顺文字 */
@@ -588,7 +643,12 @@ const WriteTool = {
                 else if(i === this.step) col = 'rgba(233,30,99,0.18)'; // 当前笔
                 else col = 'rgba(233,30,99,0.07)';                     // 未写
                 ctx.fillStyle = col;
-                try{ ctx.fill(new Path2D(d)); }catch(e){}
+                // 兼容旧浏览器：Path2D 不存在时用 SVG image fallback
+                try{
+                    if (typeof Path2D !== 'undefined') {
+                        ctx.fill(new Path2D(d));
+                    }
+                }catch(e){}
             });
             // 起笔圆点（翻转系内，用原始坐标自动翻转）
             if(this.step < this.strokes.length){
@@ -699,14 +759,31 @@ const WriteTool = {
             }
             this.curPath = null;
         };
-        c.addEventListener('pointerdown', down);
-        c.addEventListener('pointermove', move);
-        c.addEventListener('pointerup', up);
-        c.addEventListener('pointercancel', up);
+        // 兼容百度浏览器（旧 Chromium）：优先 pointer，fallback 到 touch + mouse
+        const supportsPointer = ('PointerEvent' in window) || ('onpointerdown' in window);
+        if (supportsPointer) {
+            c.addEventListener('pointerdown', down);
+            c.addEventListener('pointermove', move);
+            c.addEventListener('pointerup', up);
+            c.addEventListener('pointercancel', up);
+        } else {
+            // touch 事件需要 passive:false 才能阻止默认滚动
+            c.addEventListener('touchstart', down, { passive: false });
+            c.addEventListener('touchmove', move, { passive: false });
+            c.addEventListener('touchend', up, { passive: false });
+            c.addEventListener('touchcancel', up, { passive: false });
+            // 鼠标事件（桌面端 fallback）
+            c.addEventListener('mousedown', down);
+            c.addEventListener('mousemove', move);
+            c.addEventListener('mouseup', up);
+            c.addEventListener('mouseleave', up);
+        }
     },
     pos(e){
         const r = this.canvas.getBoundingClientRect();
-        return { x: (e.clientX - r.left) * (this.S / r.width), y: (e.clientY - r.top) * (this.S / r.height) };
+        // 兼容 pointer/mouse/touch：touch 事件取 touches[0] 或 changedTouches[0]
+        const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+        return { x: (t.clientX - r.left) * (this.S / r.width), y: (t.clientY - r.top) * (this.S / r.height) };
     }
 };
 

@@ -308,8 +308,19 @@ const Voice = {
         if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器'); return false; }
         window.speechSynthesis.cancel();
         const voices = window.speechSynthesis.getVoices() || [];
-        const hints = lang.startsWith('zh') ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','zh-CN','zh_CN'] : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','en-US','en_US'];
-        const v = voices.find(x => hints.some(h => (x.name||'').includes(h) || x.lang === h));
+        // 女声匹配：先按已知女声名，再按女声关键词，最后按 lang 匹配
+        const femaleHints = lang.startsWith('zh')
+            ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','晓晓','晓秋','晓伊','晓梦','云夏','云扬','云希','云杰','Xiaoxiao','Xiaoyi','Xiaomeng','Yunyang','Yunxi','Huihui','Kangkang']
+            : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','Jenny','Aria','Jessa','Zira','Michelle','female','Female','女声'];
+        const langHints = lang.startsWith('zh') ? ['zh-CN','zh_CN','zh','cmn'] : ['en-US','en_US','en','en-GB'];
+        // 1. 精确匹配已知女声名
+        let v = voices.find(x => femaleHints.some(h => (x.name||'').includes(h)));
+        // 2. 名字含 female/女声 关键词
+        if(!v) v = voices.find(x => /female|女声|woman|girl/i.test(x.name||''));
+        // 3. 按 lang 匹配，优先女声
+        if(!v) v = voices.find(x => femaleHints.some(h => (x.lang||'').includes(h)) || langHints.some(h => (x.lang||'').includes(h) && /female|女/i.test(x.name||'')));
+        // 4. 任意 lang 匹配
+        if(!v) v = voices.find(x => langHints.some(h => (x.lang||'') === h || (x.lang||'').startsWith(h.split('-')[0])));
         const queue = [];
         if(opts.intro) queue.push({ t: opts.intro, p: 1.32, r: 1.0, gap: 220 });
         const parts = text.match(/[^。！？，；,.!?;]+[。！？，；,.!?;]?/g) || [text];
