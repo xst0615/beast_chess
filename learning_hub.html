@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>幼升小学习中心</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%);
+        min-height: 100vh; padding: 15px;
+        display: flex; flex-direction: column; align-items: center;
+    }
+    h1 {
+        color: #e91e63; font-size: 26px; margin: 10px 0 14px;
+        letter-spacing: 2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+    .back-link { position: absolute; top: 15px; left: 15px; color: #e91e63; text-decoration: none; font-size: 14px; background: #fff; padding: 6px 12px; border-radius: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+
+    /* 总览栏 */
+    .overview-bar {
+        display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+        background: #fff; padding: 12px 16px; border-radius: 14px;
+        box-shadow: 0 4px 12px rgba(233,30,99,0.12); width: 100%; max-width: 720px;
+        margin-bottom: 14px;
+    }
+    .overview-bar .item {
+        display: flex; flex-direction: column; align-items: center; flex: 1;
+        min-width: 80px; padding: 6px;
+    }
+    .overview-bar .val { font-size: 20px; font-weight: bold; color: #e91e63; }
+    .overview-bar .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+    .overview-bar .divider { width: 1px; background: #eee; margin: 4px 0; }
+
+    /* 等级进度条 */
+    .level-bar {
+        width: 100%; max-width: 720px; background: #fff; border-radius: 14px;
+        padding: 12px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 14px;
+    }
+    .level-bar .lv-head { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; color: #555; }
+    .level-bar .lv-name { color: #e91e63; font-weight: bold; }
+    .level-bar .progress-track { height: 14px; background: #f5f5f5; border-radius: 8px; overflow: hidden; }
+    .level-bar .progress-fill { height: 100%; background: linear-gradient(90deg, #ff80ab, #e91e63); transition: width 0.5s; }
+    .level-bar .lv-tip { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+    /* 模块卡片 */
+    .module-grid {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+        max-width: 720px; width: 100%; margin-bottom: 14px;
+    }
+    @media (max-width: 500px) { .module-grid { grid-template-columns: 1fr; } }
+    .module-card {
+        background: #fff; border-radius: 16px; padding: 20px 14px; text-align: center;
+        text-decoration: none; color: #333; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transition: all 0.2s; border: 3px solid transparent;
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .module-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(233,30,99,0.2); border-color: #f8bbd0; }
+    .module-card .icon { font-size: 42px; line-height: 1; }
+    .module-card .name { font-size: 18px; font-weight: bold; color: #e91e63; margin-top: 4px; }
+    .module-card .progress { font-size: 12px; color: #888; margin-top: 2px; }
+    .module-card .progress b { color: #43a047; }
+
+    /* 勋章墙 */
+    .section { width: 100%; max-width: 720px; background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 14px; }
+    .section h2 { color: #e91e63; font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .badge-wall { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    @media (max-width: 500px) { .badge-wall { grid-template-columns: repeat(2, 1fr); } }
+    .badge {
+        background: #f5f5f5; border-radius: 12px; padding: 12px 6px; text-align: center;
+        opacity: 0.4; filter: grayscale(1); transition: all 0.3s;
+    }
+    .badge.on { background: linear-gradient(135deg, #fff59d, #ffca28); opacity: 1; filter: none; box-shadow: 0 4px 10px rgba(255,193,7,0.3); }
+    .badge .b-icon { font-size: 28px; }
+    .badge .b-name { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.2; }
+
+    /* 打卡日历 */
+    .calendar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+    @media (max-width: 500px) { .calendar { grid-template-columns: repeat(8, 1fr); } }
+    .cal-cell {
+        aspect-ratio: 1; border-radius: 50%; background: #eee; font-size: 10px;
+        display: flex; align-items: center; justify-content: center; color: #999;
+        transition: all 0.2s;
+    }
+    .cal-cell.on { background: linear-gradient(135deg, #66bb6a, #43a047); color: #fff; }
+    .cal-cell.today { border: 2px solid #e91e63; font-weight: bold; }
+
+    /* 错题入口 */
+    .wrong-entry {
+        display: block; width: 100%; max-width: 720px; background: linear-gradient(135deg, #ff7043, #f4511e);
+        color: #fff; padding: 14px; border-radius: 14px; text-align: center; text-decoration: none;
+        font-weight: bold; font-size: 15px; box-shadow: 0 4px 12px rgba(244,81,30,0.3);
+        margin-bottom: 20px;
+    }
+    .wrong-entry:hover { opacity: 0.9; }
+
+    .tip { font-size: 12px; color: #888; text-align: center; margin: 10px 0; max-width: 720px; }
+</style>
+</head>
+<body>
+<a href="index.html" class="back-link">← 返回主页</a>
+<h1>🌟 幼升小学习中心 🌟</h1>
+
+<div class="overview-bar" id="overview"></div>
+
+<div class="level-bar" id="level-bar"></div>
+
+<div class="module-grid">
+    <a href="chinese_chars.html" class="module-card">
+        <div class="icon">📖</div>
+        <div class="name">识字</div>
+        <div class="progress" id="p-chinese">0 / 100 字</div>
+    </a>
+    <a href="pinyin.html" class="module-card">
+        <div class="icon">🔤</div>
+        <div class="name">拼音</div>
+        <div class="progress" id="p-pinyin">0 / 63 拼音</div>
+    </a>
+    <a href="math_thinking.html" class="module-card">
+        <div class="icon">🔢</div>
+        <div class="name">数学思维</div>
+        <div class="progress" id="p-math">0 / 40 课</div>
+    </a>
+    <a href="english.html" class="module-card">
+        <div class="icon">🅰️</div>
+        <div class="name">英语</div>
+        <div class="progress" id="p-english">0 / 40 课</div>
+    </a>
+</div>
+
+<div class="section">
+    <h2>🏅 勋章墙</h2>
+    <div class="badge-wall" id="badge-wall"></div>
+</div>
+
+<div class="section">
+    <h2>🔥 连续打卡（最近 30 天）</h2>
+    <div class="calendar" id="calendar"></div>
+    <div class="tip" id="streak-tip">今天还没学习哦，点上方任意模块开始吧！</div>
+</div>
+
+<a href="#" class="wrong-entry" id="wrong-entry" onclick="viewWrong(); return false;">📌 错题本 (0)</a>
+
+<div class="tip">💡 建议用 Chrome 浏览器打开，语音跟读体验最佳。每日学习 15-20 分钟，坚持就是胜利！</div>
+
+<script>
+// ================= 共享存储 =================
+const Store = {
+    get(key, def) {
+        try { const v = JSON.parse(localStorage.getItem(key)); return v === null ? def : v; }
+        catch (e) { return def; }
+    },
+    set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+    addStar(n = 1) {
+        const s = (Store.get('learn_stars', 0)) + n;
+        Store.set('learn_stars', s);
+        return s;
+    },
+    addProgress(module, n = 1) {
+        const p = Store.get('learn_progress', { chinese: 0, pinyin: 0, math: 0, english: 0 });
+        p[module] = (p[module] || 0) + n;
+        Store.set('learn_progress', p);
+        return p;
+    },
+    addWrong(module, id) {
+        const w = Store.get('learn_wrong', []);
+        if (!w.find(x => x.module === module && x.id === id)) {
+            w.push({ module, id, addedAt: Date.now() });
+            Store.set('learn_wrong', w);
+        }
+    },
+    removeWrong(module, id) {
+        const w = Store.get('learn_wrong', []).filter(x => !(x.module === module && x.id === id));
+        Store.set('learn_wrong', w);
+    },
+    dailyCheckin() {
+        const s = Store.get('learn_streak', { days: 0, lastDate: null });
+        const today = new Date().toDateString();
+        if (s.lastDate === today) return s;
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        s.days = (s.lastDate === yesterday) ? s.days + 1 : 1;
+        s.lastDate = today;
+        Store.set('learn_streak', s);
+        return s;
+    },
+    awardBadge(id) {
+        const b = Store.get('learn_badges', []);
+        if (!b.includes(id)) { b.push(id); Store.set('learn_badges', b); }
+    },
+};
+
+// ================= 等级 =================
+const LEVELS = [
+    { name: '青铜', min: 0, color: '#a1887f' },
+    { name: '白银', min: 50, color: '#90a4ae' },
+    { name: '黄金', min: 100, color: '#ffc107' },
+    { name: '铂金', min: 200, color: '#26c6da' },
+    { name: '钻石', min: 350, color: '#7c4dff' },
+    { name: '王者', min: 500, color: '#e91e63' },
+];
+function getLevel(stars) {
+    let lv = LEVELS[0], idx = 0;
+    for (let i = 0; i < LEVELS.length; i++) {
+        if (stars >= LEVELS[i].min) { lv = LEVELS[i]; idx = i; }
+    }
+    const next = LEVELS[idx + 1];
+    const progress = next ? (stars - lv.min) / (next.min - lv.min) : 1;
+    return { ...lv, idx, next, progress, stars };
+}
+
+// ================= 勋章定义 =================
+const BADGES = [
+    { id: 'pinyin_master', icon: '🔤', name: '拼音小达人', desc: '完成全部声母' },
+    { id: 'char_50', icon: '📖', name: '识字百字', desc: '识字累计 50 字' },
+    { id: 'math_calc', icon: '🔢', name: '数算小能手', desc: '运算 10 课全对' },
+    { id: 'english_30', icon: '🅰️', name: '英语开口说', desc: '英语跟读 30 次' },
+    { id: 'streak_7', icon: '🔥', name: '坚持 7 天', desc: '连续打卡 7 天' },
+    { id: 'streak_30', icon: '👑', name: '全勤王', desc: '连续打卡 30 天' },
+    { id: 'wrong_clear', icon: '✨', name: '错题清零', desc: '错题本清空一次' },
+    { id: 'star_100', icon: '⭐', name: '百星达成', desc: '累计 100 颗星' },
+];
+
+// ================= 渲染 =================
+function render() {
+    const stars = Store.get('learn_stars', 0);
+    const progress = Store.get('learn_progress', { chinese: 0, pinyin: 0, math: 0, english: 0 });
+    const streak = Store.get('learn_streak', { days: 0, lastDate: null });
+    const wrong = Store.get('learn_wrong', []);
+    const badges = Store.get('learn_badges', []);
+
+    // 自动解锁勋章
+    if (streak.days >= 7) Store.awardBadge('streak_7');
+    if (streak.days >= 30) Store.awardBadge('streak_30');
+    if (stars >= 100) Store.awardBadge('star_100');
+    if (progress.pinyin >= 23) Store.awardBadge('pinyin_master');
+    if (progress.chinese >= 50) Store.awardBadge('char_50');
+    if (wrong.length === 0 && stars > 0) Store.awardBadge('wrong_clear');
+    const finalBadges = Store.get('learn_badges', []);
+
+    // 总览
+    $('overview').innerHTML = `
+        <div class="item"><div class="val">${stars}</div><div class="lbl">⭐ 总星星</div></div>
+        <div class="divider"></div>
+        <div class="item"><div class="val">${streak.days}</div><div class="lbl">🔥 连续天</div></div>
+        <div class="divider"></div>
+        <div class="item"><div class="val">${finalBadges.length}</div><div class="lbl">🏅 勋章</div></div>
+        <div class="divider"></div>
+        <div class="item"><div class="val">${wrong.length}</div><div class="lbl">📌 错题</div></div>
+    `;
+
+    // 等级
+    const lv = getLevel(stars);
+    $('level-bar').innerHTML = `
+        <div class="lv-head"><span>当前等级</span><span class="lv-name" style="color:${lv.color}">${lv.name} ${lv.idx + 1}</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:${lv.progress * 100}%"></div></div>
+        <div class="lv-tip">${lv.next ? `距 ${lv.next.name} 还差 ${lv.next.min - stars} ⭐` : '已达最高等级 👑'}</div>
+    `;
+
+    // 模块进度
+    $('p-chinese').innerHTML = `<b>${progress.chinese}</b> / 100 字`;
+    $('p-pinyin').innerHTML = `<b>${progress.pinyin}</b> / 63 拼音`;
+    $('p-math').innerHTML = `<b>${progress.math}</b> / 40 课`;
+    $('p-english').innerHTML = `<b>${progress.english}</b> / 40 课`;
+
+    // 勋章墙
+    $('badge-wall').innerHTML = BADGES.map(b => `
+        <div class="badge ${finalBadges.includes(b.id) ? 'on' : ''}" title="${b.desc}">
+            <div class="b-icon">${b.icon}</div>
+            <div class="b-name">${b.name}</div>
+        </div>
+    `).join('');
+
+    // 打卡日历
+    renderCalendar(streak);
+
+    // 错题入口
+    $('wrong-entry').textContent = `📌 错题本 (${wrong.length})`;
+}
+
+function renderCalendar(streak) {
+    const today = new Date();
+    const cells = [];
+    for (let i = 29; i >= 0; i--) {
+        const d = new Date(today.getTime() - i * 86400000);
+        const ds = d.toDateString();
+        const isToday = i === 0;
+        // 简化：若 streak.lastDate 在 d 这一天或之前，且距离今天 ≤ streak.days，则标记
+        const on = (30 - i) > (30 - streak.days) && streak.days > 0;
+        cells.push(`<div class="cal-cell ${on ? 'on' : ''} ${isToday ? 'today' : ''}">${d.getDate()}</div>`);
+    }
+    $('calendar').innerHTML = cells.join('');
+    if (streak.lastDate === today.toDateString()) {
+        $('streak-tip').textContent = `已连续打卡 ${streak.days} 天！继续保持哦 🎉`;
+    }
+}
+
+function viewWrong() {
+    const wrong = Store.get('learn_wrong', []);
+    if (!wrong.length) { alert('错题本空空如也，继续保持！'); return; }
+    // 按模块分类显示
+    const byMod = {};
+    wrong.forEach(w => { byMod[w.module] = (byMod[w.module] || 0) + 1; });
+    const names = { chinese: '识字', pinyin: '拼音', math: '数学', english: '英语' };
+    const msg = Object.entries(byMod).map(([k, v]) => `${names[k]}: ${v} 题`).join('\n');
+    alert(`错题本共 ${wrong.length} 题：\n\n${msg}\n\n点击对应模块进入后，会优先复习错题。`);
+}
+
+const $ = id => document.getElementById(id);
+render();
+</script>
+</body>
+</html>

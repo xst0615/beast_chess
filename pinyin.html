@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼音学堂 · 幼升小</title>
+<style>
+    :root {
+        --main: #e91e63;
+        --main-light: #f8bbd0;
+        --main-dark: #ad1457;
+        --bg1: #fff3e0;
+        --bg2: #fce4ec;
+        --ok: #43a047;
+        --warn: #fb8c00;
+        --err: #e53935;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
+        min-height: 100vh; padding: 12px; padding-bottom: 30px;
+        display: flex; flex-direction: column; align-items: center;
+    }
+    .back-link {
+        position: absolute; top: 12px; left: 12px;
+        color: var(--main); text-decoration: none; font-size: 14px;
+        background: #fff; padding: 6px 12px; border-radius: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); z-index: 5;
+    }
+    h1 {
+        color: var(--main); font-size: 24px; margin: 8px 0 10px;
+        letter-spacing: 2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .top-bar {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        justify-content: center; background: #fff; padding: 8px 12px;
+        border-radius: 12px; box-shadow: 0 3px 8px rgba(233,30,99,0.12);
+        width: 100%; max-width: 640px; font-size: 13px; margin-bottom: 10px;
+    }
+    .top-bar .info { font-weight: bold; color: var(--main); }
+    .top-bar .tag {
+        background: var(--main-light); color: var(--main-dark);
+        padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold;
+    }
+    .top-bar .spacer { flex: 1; }
+    .top-bar .stars { color: #fb8c00; font-weight: bold; }
+    .top-bar .progress-mini { font-size: 12px; color: #888; }
+    .pinyin-card {
+        background: #fff; border-radius: 18px; border: 3px solid var(--main-light);
+        box-shadow: 0 6px 16px rgba(233,30,99,0.15); padding: 18px 12px;
+        width: 100%; max-width: 640px; text-align: center; margin-bottom: 10px;
+    }
+    .pinyin-big {
+        font-size: 84px; line-height: 1.1; font-weight: bold; color: var(--main);
+        letter-spacing: 4px; text-shadow: 2px 2px 0 rgba(233,30,99,0.08);
+    }
+    @media (max-width: 480px) { .pinyin-big { font-size: 60px; } }
+    .pinyin-hint { font-size: 12px; color: #aaa; margin-top: 4px; }
+    .mouth-card {
+        background: linear-gradient(135deg, #fff8e1, #fff); border-radius: 14px;
+        border-left: 5px solid var(--main); padding: 10px 14px; width: 100%;
+        max-width: 640px; margin-bottom: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+        font-size: 14px; color: #555; line-height: 1.5;
+    }
+    .mouth-card .label { color: var(--main); font-weight: bold; margin-right: 4px; }
+    .section {
+        background: #fff; border-radius: 14px; padding: 12px; width: 100%;
+        max-width: 640px; margin-bottom: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+    }
+    .section h3 {
+        color: var(--main); font-size: 14px; margin-bottom: 8px;
+        display: flex; align-items: center; gap: 4px;
+    }
+    .ex-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .ex-btn {
+        flex: 1; min-width: 120px; min-height: 56px; border: 2px solid var(--main-light);
+        border-radius: 12px; background: linear-gradient(135deg, #fce4ec, #fff);
+        font-family: inherit; cursor: pointer; display: flex; align-items: center;
+        justify-content: center; gap: 8px; transition: all 0.15s; padding: 6px 10px;
+    }
+    .ex-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(233,30,99,0.2); border-color: var(--main); }
+    .ex-btn .char { font-size: 30px; color: var(--main); font-weight: bold; }
+    .ex-btn .word { font-size: 13px; color: #888; }
+    .ex-btn .ic { font-size: 18px; }
+    .tone-block { margin-bottom: 12px; }
+    .tone-block:last-child { margin-bottom: 0; }
+    .tone-block .tb-head {
+        font-size: 16px; font-weight: bold; color: var(--main-dark); margin-bottom: 6px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .tone-block .tb-head .done-dot { font-size: 13px; color: var(--ok); }
+    .tone-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    @media (max-width: 420px) { .tone-grid { grid-template-columns: repeat(2, 1fr); } }
+    .tone-cell {
+        background: #fafafa; border: 2px solid #eee; border-radius: 10px;
+        padding: 6px 4px; text-align: center;
+    }
+    .tone-cell.ok { background: #e8f5e9; border-color: var(--ok); }
+    .tone-cell .tm { font-size: 26px; font-weight: bold; color: #333; margin-bottom: 2px; }
+    .tone-cell .tb-acts { display: flex; gap: 4px; justify-content: center; }
+    .mini-btn {
+        min-width: 48px; min-height: 40px; border: none; border-radius: 8px;
+        background: var(--main); color: #fff; font-size: 16px; cursor: pointer;
+        font-family: inherit; transition: background 0.15s, transform 0.1s; padding: 0 8px;
+    }
+    .mini-btn:hover { background: var(--main-dark); }
+    .mini-btn:active { transform: scale(0.95); }
+    .mini-btn.mic { background: #26a69a; }
+    .mini-btn.mic:hover { background: #00796b; }
+    .mini-btn.rec { background: #ff7043; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .blend-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .blend-chip {
+        background: #f3e5f5; border: 2px solid var(--main-light); border-radius: 10px;
+        padding: 8px 10px; display: flex; align-items: center; gap: 6px;
+        font-size: 18px; font-weight: bold; color: var(--main-dark);
+    }
+    .blend-chip .plus, .blend-chip .eq { color: #aaa; font-weight: normal; }
+    .blend-chip .res { color: var(--main); }
+    .blend-chip .spk { font-size: 18px; cursor: pointer; }
+    .main-actions { display: flex; gap: 10px; margin-top: 4px; }
+    .main-btn {
+        flex: 1; min-height: 56px; border: none; border-radius: 14px; font-family: inherit;
+        font-size: 17px; font-weight: bold; cursor: pointer; transition: all 0.15s;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .main-btn.hear { background: var(--main); color: #fff; }
+    .main-btn.hear:hover { background: var(--main-dark); }
+    .main-btn.read { background: #26a69a; color: #fff; }
+    .main-btn.read:hover { background: #00796b; }
+    .main-btn.rec { background: #ff7043; animation: pulse 1s infinite; }
+    .main-btn:active { transform: scale(0.98); }
+    .feedback {
+        min-height: 40px; text-align: center; font-size: 16px; font-weight: bold;
+        padding: 8px; border-radius: 10px; margin-top: 8px; transition: all 0.2s;
+    }
+    .feedback.ok { background: #e8f5e9; color: var(--ok); }
+    .feedback.warn { background: #fff3e0; color: var(--warn); }
+    .feedback.err { background: #ffebee; color: var(--err); }
+    .feedback.idle { color: #aaa; }
+    .nav-row { display: flex; gap: 10px; margin-top: 12px; width: 100%; max-width: 640px; }
+    .nav-btn {
+        flex: 1; min-height: 52px; border: 2px solid var(--main-light); border-radius: 12px;
+        font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer;
+        transition: all 0.15s; background: #fff; color: var(--main);
+    }
+    .nav-btn:hover { background: var(--main-light); }
+    .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .nav-btn.home { flex: 0 0 80px; background: #eee; color: #666; border-color: #ddd; }
+    .tip { font-size: 12px; color: #aaa; text-align: center; margin-top: 10px; max-width: 640px; }
+</style>
+</head>
+<body>
+<a href="learning_hub.html" class="back-link">← 学习中心</a>
+<h1>🔤 拼音学堂</h1>
+
+<div class="top-bar" id="top-bar"></div>
+
+<div class="pinyin-card">
+    <div class="pinyin-big" id="pinyin-big"></div>
+    <div class="pinyin-hint" id="pinyin-hint">点下方 🔊 听发音</div>
+</div>
+
+<div class="mouth-card" id="mouth-card"></div>
+
+<div class="section">
+    <h3>📖 例字（点 🔊 跟着读）</h3>
+    <div class="ex-row" id="ex-row"></div>
+</div>
+
+<div class="section">
+    <h3>🎵 四声练习（🔊 朗读 · 🎤 跟读）</h3>
+    <div id="tone-area"></div>
+</div>
+
+<div class="section" id="blend-section">
+    <h3>🧩 拼读组合</h3>
+    <div class="blend-row" id="blend-row"></div>
+</div>
+
+<div class="section">
+    <h3>🎤 我来读</h3>
+    <div class="main-actions">
+        <button class="main-btn hear" id="btn-hear" onclick="hearPinyin()">🔊 听发音</button>
+        <button class="main-btn read" id="btn-read" onclick="readPinyin()">🎤 跟读</button>
+    </div>
+    <div class="feedback idle" id="feedback">准备好就点 🎤 跟读吧</div>
+</div>
+
+<div class="nav-row">
+    <button class="nav-btn" id="btn-prev" onclick="prev()">⬅ 上一课</button>
+    <button class="nav-btn home" onclick="location.href='learning_hub.html'">🏠</button>
+    <button class="nav-btn" id="btn-next" onclick="next()">下一课 ➡</button>
+</div>
+
+<div class="tip">💡 用 Chrome 浏览器，允许麦克风权限。跟读成功得 ⭐，全部四声过关自动进入下一课。</div>
+
+<script>
+// ================= 共享存储 =================
+const Store = {
+    get(k, def) { try { const v = JSON.parse(localStorage.getItem(k)); return v === null ? def : v; } catch(e) { return def; } },
+    set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
+    addStar(n = 1) { const s = (Store.get('learn_stars', 0)) + n; Store.set('learn_stars', s); return s; },
+    addProgress(module, n = 1) {
+        const p = Store.get('learn_progress', { chinese: 0, pinyin: 0, math: 0, english: 0 });
+        p[module] = (p[module] || 0) + n; Store.set('learn_progress', p); return p;
+    },
+    addWrong(module, id) {
+        const w = Store.get('learn_wrong', []);
+        if (!w.find(x => x.module === module && x.id === id)) {
+            w.push({ module, id, addedAt: Date.now() }); Store.set('learn_wrong', w);
+        }
+    },
+    removeWrong(module, id) {
+        const w = Store.get('learn_wrong', []).filter(x => !(x.module === module && x.id === id));
+        Store.set('learn_wrong', w);
+    },
+    dailyCheckin() {
+        const s = Store.get('learn_streak', { days: 0, lastDate: null });
+        const today = new Date().toDateString();
+        if (s.lastDate === today) return s;
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        s.days = (s.lastDate === yesterday) ? s.days + 1 : 1;
+        s.lastDate = today; Store.set('learn_streak', s); return s;
+    },
+    awardBadge(id) {
+        const b = Store.get('learn_badges', []);
+        if (!b.includes(id)) { b.push(id); Store.set('learn_badges', b); }
+    },
+};
+
+// ================= 语音工具 =================
+const Voice = {
+    speak(text, lang = 'zh-CN', rate = 0.9) {
+        if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器'); return false; }
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang; u.rate = rate;
+        window.speechSynthesis.speak(u);
+        return true;
+    },
+    listen(lang = 'zh-CN', onResult, onEnd) {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { alert('请用 Chrome 浏览器'); onResult(null); return false; }
+        const r = new SR();
+        r.lang = lang; r.continuous = false; r.interimResults = false;
+        r.maxAlternatives = 3;
+        r.onresult = e => onResult(e.results[0][0].transcript);
+        r.onerror = () => onResult(null);
+        r.onend = () => onEnd && onEnd();
+        r.start();
+        return true;
+    },
+    score(target, heard) {
+        if (!heard) return 0;
+        if (heard.includes(target) || target.includes(heard)) return 2;
+        return 0;
+    }
+};
+
+// 任意一个目标命中即算对
+function scoreAny(targets, heard) {
+    if (!heard) return false;
+    return targets.some(t => heard.includes(t) || t.includes(heard));
+}
+
+// ================= 拼音声调标记生成 =================
+const TONE_MAP = {
+    a: ['ā','á','ǎ','à'], o: ['ō','ó','ǒ','ò'], e: ['ē','é','ě','è'],
+    i: ['ī','í','ǐ','ì'], u: ['ū','ú','ǔ','ù'], ü: ['ǖ','ǘ','ǚ','ǜ']
+};
+function toneMark(syl, tone) {
+    if (tone < 1 || tone > 4) return syl;
+    let idx = -1;
+    if (syl.includes('a')) idx = syl.indexOf('a');
+    else if (syl.includes('e')) idx = syl.indexOf('e');
+    else if (syl.includes('o')) idx = syl.indexOf('o');
+    else if (syl.includes('ü')) idx = syl.indexOf('ü');
+    else if (syl.includes('i') && syl.includes('u')) idx = Math.max(syl.indexOf('i'), syl.indexOf('u'));
+    else if (syl.includes('i')) idx = syl.indexOf('i');
+    else if (syl.includes('u')) idx = syl.indexOf('u');
+    if (idx === -1) return syl;
+    const ch = syl[idx];
+    if (!TONE_MAP[ch]) return syl;
+    return syl.slice(0, idx) + TONE_MAP[ch][tone - 1] + syl.slice(idx + 1);
+}
+
+// 声母 -> 用于四声练习的载音节
+const TB = {
+    b:'ba', p:'pa', m:'ma', f:'fa', d:'da', t:'ta', n:'na', l:'la',
+    g:'ge', k:'ke', h:'he', j:'ji', q:'qi', x:'xi',
+    zh:'zhi', ch:'chi', sh:'shi', r:'ri', z:'zi', c:'ci', s:'si', y:'yi', w:'wu'
+};
+
+// 每个音节的四声对应汉字（用于跟读评分）
+const WORDS = {
+    ba:['八','拔','把','爸'], pa:['趴','爬','帕','怕'], ma:['妈','麻','马','骂'],
+    fa:['发','乏','法','发'], da:['搭','达','打','大'], ta:['塌','踏','塔','踏'],
+    na:['那','拿','哪','那'], la:['拉','拉','辣','啦'], ge:['哥','阁','葛','各'],
+    ke:['科','壳','渴','客'], he:['喝','河','赫','贺'], ji:['鸡','极','几','记'],
+    qi:['七','齐','起','气'], xi:['西','习','喜','戏'],
+    zhi:['只','直','只','志'], chi:['吃','迟','尺','翅'], shi:['师','十','史','是'],
+    ri:['日','日','日','日'], zi:['资','紫','子','字'], ci:['疵','词','此','次'],
+    si:['丝','死','死','四'], yi:['衣','宜','已','义'], wu:['乌','无','五','务'],
+    a:['阿','啊','啊','啊'], o:['哦','哦','哦','哦'], e:['鹅','鹅','恶','饿'],
+    i:['衣','宜','已','义'], u:['乌','无','五','务'], ü:['驴','驴','吕','绿'],
+    ai:['哀','孩','矮','爱'], ei:['诶','贼','诶','诶'], ui:['诶','诶','诶','对'],
+    ao:['凹','熬','袄','傲'], ou:['欧','偶','藕','沤'], iu:['诶','牛','纽','留'],
+    ie:['耶','爷','野','夜'], üe:['约','月','月','月'], er:['儿','儿','耳','二'],
+    an:['安','安','俺','暗'], en:['恩','恩','恩','摁'], in:['音','银','音','印'],
+    un:['温','温','温','文'], ün:['晕','云','允','韵'], ang:['昂','昂','昂','昂'],
+    eng:['鞥','鞥','鞥','鞥'], ing:['应','赢','影','硬'], ong:['轰','红','哄','哄'],
+    yu:['淤','鱼','雨','遇'], ye:['耶','爷','野','夜'], yue:['约','月','月','月'],
+    yuan:['冤','元','远','怨'], yin:['音','银','引','印'], yun:['晕','云','允','韵'],
+    ying:['应','赢','影','硬']
+};
+
+// ================= 35 课内容 =================
+// ps: 本课拼音；ex: 例字；bl: 拼读组合；t: 类型；m: 口型描述
+const LESSONS = [
+    { t:'声母', m:'双唇闭合，气流突然冲开双唇', ps:['b'], ex:[{c:'爸',w:'爸爸'},{c:'波',w:'波纹'}], bl:[{i:'b',f:'a',r:'ba'},{i:'b',f:'o',r:'bo'}] },
+    { t:'声母', m:'双唇闭合，气流冲开双唇，强烈送气', ps:['p'], ex:[{c:'坡',w:'上坡'},{c:'怕',w:'害怕'}], bl:[{i:'p',f:'a',r:'pa'},{i:'p',f:'o',r:'po'}] },
+    { t:'声母', m:'双唇闭合，气流从鼻腔流出', ps:['m'], ex:[{c:'妈',w:'妈妈'},{c:'马',w:'小马'}], bl:[{i:'m',f:'a',r:'ma'},{i:'m',f:'o',r:'mo'}] },
+    { t:'声母', m:'上齿轻咬下唇，气流摩擦而出', ps:['f'], ex:[{c:'发',w:'发现'},{c:'飞',w:'飞机'}], bl:[{i:'f',f:'a',r:'fa'},{i:'f',f:'u',r:'fu'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流突然放开', ps:['d'], ex:[{c:'大',w:'大小'},{c:'刀',w:'小刀'}], bl:[{i:'d',f:'a',r:'da'},{i:'d',f:'e',r:'de'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流放开并送气', ps:['t'], ex:[{c:'他',w:'他们'},{c:'兔',w:'兔子'}], bl:[{i:'t',f:'a',r:'ta'},{i:'t',f:'e',r:'te'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流从鼻腔流出', ps:['n'], ex:[{c:'鸟',w:'小鸟'},{c:'牛',w:'黄牛'}], bl:[{i:'n',f:'a',r:'na'},{i:'n',f:'i',r:'ni'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流从舌头两侧流出', ps:['l'], ex:[{c:'老',w:'老人'},{c:'里',w:'里面'}], bl:[{i:'l',f:'a',r:'la'},{i:'l',f:'e',r:'le'}] },
+    { t:'声母', m:'舌根抵住软腭，气流突然放开', ps:['g'], ex:[{c:'哥',w:'哥哥'},{c:'狗',w:'小狗'}], bl:[{i:'g',f:'e',r:'ge'},{i:'g',f:'u',r:'gu'}] },
+    { t:'声母', m:'舌根抵住软腭，气流放开并送气', ps:['k'], ex:[{c:'口',w:'开口'},{c:'看',w:'看见'}], bl:[{i:'k',f:'e',r:'ke'},{i:'k',f:'u',r:'ku'}] },
+    { t:'声母', m:'舌根抵住软腭，气流摩擦而出', ps:['h'], ex:[{c:'花',w:'花朵'},{c:'河',w:'小河'}], bl:[{i:'h',f:'e',r:'he'},{i:'h',f:'u',r:'hu'}] },
+    { t:'声母', m:'舌面抵住硬腭，气流摩擦而出', ps:['j'], ex:[{c:'鸡',w:'小鸡'},{c:'家',w:'家庭'}], bl:[{i:'j',f:'i',r:'ji'}] },
+    { t:'声母', m:'舌面抵住硬腭，气流摩擦并送气', ps:['q'], ex:[{c:'七',w:'七个'},{c:'球',w:'皮球'}], bl:[{i:'q',f:'i',r:'qi'}] },
+    { t:'声母', m:'舌面接近硬腭，气流摩擦而出', ps:['x'], ex:[{c:'西',w:'西方'},{c:'小',w:'大小'}], bl:[{i:'x',f:'i',r:'xi'}] },
+    { t:'声母', m:'舌尖翘起抵住硬腭前部，气流突然放开', ps:['zh'], ex:[{c:'竹',w:'竹子'},{c:'中',w:'中间'}], bl:[{i:'zh',f:'a',r:'zha'}] },
+    { t:'声母', m:'舌尖翘起抵住硬腭前部，气流送气', ps:['ch'], ex:[{c:'车',w:'汽车'},{c:'吃',w:'吃饭'}], bl:[{i:'ch',f:'a',r:'cha'}] },
+    { t:'声母', m:'舌尖翘起靠近硬腭，气流摩擦而出', ps:['sh'], ex:[{c:'书',w:'看书'},{c:'水',w:'喝水'}], bl:[{i:'sh',f:'a',r:'sha'}] },
+    { t:'声母', m:'舌尖翘起靠近硬腭，声带振动', ps:['r'], ex:[{c:'人',w:'人民'},{c:'日',w:'日月'}], bl:[{i:'r',f:'e',r:'re'}] },
+    { t:'声母', m:'舌尖平伸抵住上齿背，气流突然放开', ps:['z'], ex:[{c:'字',w:'写字'},{c:'早',w:'早上'}], bl:[{i:'z',f:'a',r:'za'}] },
+    { t:'声母', m:'舌尖平伸抵住上齿背，气流送气', ps:['c'], ex:[{c:'草',w:'小草'},{c:'才',w:'刚才'}], bl:[{i:'c',f:'a',r:'ca'}] },
+    { t:'声母', m:'舌尖平伸靠近上齿背，气流摩擦而出', ps:['s'], ex:[{c:'三',w:'三个'},{c:'四',w:'四个'}], bl:[{i:'s',f:'a',r:'sa'}] },
+    { t:'声母', m:'嘴角向两边展开，像微笑', ps:['y'], ex:[{c:'衣',w:'衣服'},{c:'雨',w:'下雨'}], bl:[{i:'y',f:'u',r:'yu'}] },
+    { t:'声母', m:'双唇收圆，像吹口哨', ps:['w'], ex:[{c:'五',w:'五个'},{c:'王',w:'国王'}], bl:[{i:'w',f:'u',r:'wu'}] },
+    { t:'韵母', m:'单韵母：a 口大开、o 圆口、e 展口', ps:['a','o','e'], ex:[{c:'阿',w:'阿姨'},{c:'鹅',w:'白鹅'}] },
+    { t:'韵母', m:'单韵母：i 展口、u 圆口、ü 圆口前', ps:['i','u','ü'], ex:[{c:'衣',w:'衣服'},{c:'鱼',w:'小鱼'}] },
+    { t:'韵母', m:'复韵母：先 a 后 i、先 e 后 i、先 u 后 i', ps:['ai','ei','ui'], ex:[{c:'爱',w:'爱心'},{c:'对',w:'对不起'}] },
+    { t:'韵母', m:'复韵母：先 a 后 o、先 o 后 u、先 i 后 u', ps:['ao','ou','iu'], ex:[{c:'袄',w:'棉袄'},{c:'牛',w:'老牛'}] },
+    { t:'韵母', m:'复韵母：先 i 后 e、先 ü 后 e、卷舌音', ps:['ie','üe','er'], ex:[{c:'夜',w:'黑夜'},{c:'月',w:'月亮'}] },
+    { t:'韵母', m:'前鼻韵母：舌前抵上齿龈收尾', ps:['an','en','in'], ex:[{c:'安',w:'平安'},{c:'音',w:'声音'}] },
+    { t:'韵母', m:'前鼻韵母：先 u/ü 再抵上齿龈', ps:['un','ün'], ex:[{c:'云',w:'白云'},{c:'文',w:'语文'}] },
+    { t:'韵母', m:'后鼻韵母：舌根抵软腭收尾', ps:['ang','eng','ing','ong'], ex:[{c:'羊',w:'小羊'},{c:'虫',w:'小虫'}] },
+    { t:'整体认读', m:'翘舌整体认读，加舌尖元音', ps:['zhi','chi','shi','ri'], ex:[{c:'吃',w:'吃饭'},{c:'日',w:'生日'}] },
+    { t:'整体认读', m:'平舌整体认读，加舌尖元音', ps:['zi','ci','si'], ex:[{c:'字',w:'写字'},{c:'四',w:'四个'}] },
+    { t:'整体认读', m:'i、u、ü 整体认读音节', ps:['yi','wu','yu'], ex:[{c:'衣',w:'衣服'},{c:'鱼',w:'小鱼'}] },
+    { t:'整体认读', m:'其余整体认读音节', ps:['ye','yue','yuan','yin','yun','ying'], ex:[{c:'月',w:'月亮'},{c:'云',w:'白云'}] }
+];
+
+// ================= 运行状态 =================
+const state = {
+    idx: 0,
+    toneDone: {},      // key "i-t" -> true  本课四声完成情况
+    itemDone: {},      // key "i" -> true    本课某拼音四声全过
+    lessonDone: false, // 本课是否已结算
+    learned: null,     // 已学拼音集合（跨课防重复计数）
+    autoAdvancing: false
+};
+
+function $(id) { return document.getElementById(id); }
+
+// 取某拼音的载音节
+function tbOf(p) { return TB[p] || p; }
+// 取某拼音四声汉字数组
+function wordsOf(p) { return WORDS[tbOf(p)] || [p, p, p, p]; }
+// 取某拼音四声带调显示
+function marksOf(p) {
+    const tb = tbOf(p);
+    return [1, 2, 3, 4].map(t => toneMark(tb, t));
+}
+
+// 初始化已学集合
+function loadLearned() {
+    if (state.learned) return;
+    const arr = Store.get('learn_pinyin_learned', []);
+    state.learned = new Set(arr);
+}
+function saveLearned() {
+    Store.set('learn_pinyin_learned', Array.from(state.learned));
+}
+
+// ================= 渲染 =================
+function render() {
+    loadLearned();
+    const L = LESSONS[state.idx];
+    const total = LESSONS.length;
+
+    // 顶栏
+    const stars = Store.get('learn_stars', 0);
+    const prog = Store.get('learn_progress', { chinese:0, pinyin:0, math:0, english:0 });
+    $('top-bar').innerHTML = `
+        <span class="info">第 ${state.idx + 1} / ${total} 课</span>
+        <span class="tag">${L.t}</span>
+        <span class="spacer"></span>
+        <span class="progress-mini">拼音 ${prog.pinyin} / 63</span>
+        <span class="stars">⭐ ${stars}</span>
+    `;
+
+    // 大字
+    $('pinyin-big').textContent = L.ps.join('  ');
+    $('pinyin-hint').textContent = `点下方 🔊 听发音，🎤 跟读得分`;
+
+    // 口型
+    $('mouth-card').innerHTML = `<span class="label">👄 口型：</span>${L.m}`;
+
+    // 例字
+    $('ex-row').innerHTML = L.ex.map((e, i) => `
+        <button class="ex-btn" onclick="hearExample(${i})">
+            <span class="char">${e.c}</span>
+            <span class="word">${e.w}</span>
+            <span class="ic">🔊</span>
+        </button>
+    `).join('');
+
+    // 四声
+    let toneHtml = '';
+    L.ps.forEach((p, i) => {
+        const marks = marksOf(p);
+        const words = wordsOf(p);
+        toneHtml += `<div class="tone-block">
+            <div class="tb-head">拼音 <b>${p}</b> 的四声 <span class="done-dot" id="dot-${i}"></span></div>
+            <div class="tone-grid">`;
+        for (let t = 0; t < 4; t++) {
+            toneHtml += `<div class="tone-cell" id="cell-${i}-${t}">
+                <div class="tm">${marks[t]}</div>
+                <div class="tb-acts">
+                    <button class="mini-btn" onclick="hearTone(${i},${t})">🔊</button>
+                    <button class="mini-btn mic" id="mic-${i}-${t}" onclick="readTone(${i},${t})">🎤</button>
+                </div>
+            </div>`;
+        }
+        toneHtml += `</div></div>`;
+    });
+    $('tone-area').innerHTML = toneHtml;
+
+    // 拼读
+    if (L.bl && L.bl.length) {
+        $('blend-section').style.display = '';
+        $('blend-row').innerHTML = L.bl.map((b, i) => `
+            <div class="blend-chip">
+                <span>${b.i}</span><span class="plus">+</span>
+                <span>${b.f}</span><span class="eq">=</span>
+                <span class="res">${b.r}</span>
+                <span class="spk" onclick="hearBlend(${i})">🔊</span>
+            </div>
+        `).join('');
+    } else {
+        $('blend-section').style.display = 'none';
+    }
+
+    // 导航
+    $('btn-prev').disabled = state.idx === 0;
+    $('btn-next').disabled = false;
+
+    // 重置本课状态
+    state.toneDone = {};
+    state.itemDone = {};
+    state.lessonDone = false;
+    setFeedback('idle', '准备好就点 🎤 跟读吧');
+    refreshDots();
+
+    // 进入新课自动朗读
+    setTimeout(() => hearPinyin(), 300);
+}
+
+function refreshDots() {
+    const L = LESSONS[state.idx];
+    L.ps.forEach((p, i) => {
+        const dot = $('dot-' + i);
+        if (dot) dot.textContent = state.itemDone[i] ? '✅ 全过' : '';
+    });
+}
+
+function setFeedback(kind, msg) {
+    const el = $('feedback');
+    el.className = 'feedback ' + kind;
+    el.textContent = msg;
+}
+
+// ================= 操作 =================
+function hearPinyin() {
+    const L = LESSONS[state.idx];
+    // 朗读第一个拼音的阴平（实际可发音的音节）
+    const p = L.ps[0];
+    const tb = tbOf(p);
+    Voice.speak(toneMark(tb, 1));
+}
+
+function hearExample(i) {
+    const L = LESSONS[state.idx];
+    Voice.speak(L.ex[i].w);
+}
+
+function hearTone(i, t) {
+    const L = LESSONS[state.idx];
+    const p = L.ps[i];
+    Voice.speak(marksOf(p)[t]);
+}
+
+function hearBlend(i) {
+    const L = LESSONS[state.idx];
+    Voice.speak(L.bl[i].r);
+}
+
+// 主跟读：识别汉字，包含本课任一例字/声调字即算对
+function readPinyin() {
+    const L = LESSONS[state.idx];
+    const targets = [];
+    L.ex.forEach(e => targets.push(e.c));
+    L.ps.forEach(p => wordsOf(p).forEach(w => targets.push(w)));
+    doListen('btn-read', targets, (ok, heard) => {
+        if (ok) {
+            Store.dailyCheckin();
+            Store.addStar(1);
+            setFeedback('ok', `✅ 太棒了！听到「${heard}」+1 ⭐`);
+            const id = `L${state.idx}-main`;
+            Store.removeWrong('pinyin', id);
+        } else {
+            setFeedback('warn', heard ? `🟡 听到「${heard}」，再试一次` : '🟡 没听清，再说一次');
+            Store.addWrong('pinyin', `L${state.idx}-main`);
+        }
+        refreshTop();
+    });
+}
+
+// 单声调跟读
+function readTone(i, t) {
+    if (state.toneDone[i + '-' + t]) {
+        setFeedback('ok', '✅ 这一声已经过关啦');
+        return;
+    }
+    const L = LESSONS[state.idx];
+    const p = L.ps[i];
+    const word = wordsOf(p)[t];
+    const mark = marksOf(p)[t];
+    const micBtn = $('mic-' + i + '-' + t);
+    doListen('mic-' + i + '-' + t, [word, mark], (ok, heard) => {
+        if (ok) {
+            state.toneDone[i + '-' + t] = true;
+            $('cell-' + i + '-' + t).classList.add('ok');
+            Store.dailyCheckin();
+            Store.addStar(1);
+            Store.removeWrong('pinyin', `L${state.idx}-${i}-${t}`);
+            setFeedback('ok', `✅ 「${mark}」读对了！+1 ⭐`);
+            checkItemDone(i);
+        } else {
+            Store.addWrong('pinyin', `L${state.idx}-${i}-${t}`);
+            setFeedback('warn', heard ? `🟡 听到「${heard}」，跟读「${mark}(${word})」` : `🟡 没听清，再读「${mark}」`);
+        }
+        refreshTop();
+    });
+}
+
+// 检查某拼音四声是否全过
+function checkItemDone(i) {
+    if (state.itemDone[i]) return;
+    for (let t = 0; t < 4; t++) {
+        if (!state.toneDone[i + '-' + t]) return;
+    }
+    state.itemDone[i] = true;
+    refreshDots();
+    // 新学一个拼音 +1 进度
+    const L = LESSONS[state.idx];
+    const p = L.ps[i];
+    if (!state.learned.has(p)) {
+        state.learned.add(p);
+        saveLearned();
+        Store.addProgress('pinyin', 1);
+        const prog = Store.get('learn_progress', { chinese:0, pinyin:0, math:0, english:0 });
+        if (prog.pinyin >= 23) Store.awardBadge('pinyin_master');
+    }
+    checkLessonDone();
+}
+
+// 检查整课是否全过
+function checkLessonDone() {
+    if (state.lessonDone) return;
+    const L = LESSONS[state.idx];
+    for (let i = 0; i < L.ps.length; i++) {
+        if (!state.itemDone[i]) return;
+    }
+    state.lessonDone = true;
+    Store.addStar(1); // 全课过关奖励
+    setFeedback('ok', `🎉 本课全部过关！+1 ⭐，进入下一课…`);
+    refreshTop();
+    state.autoAdvancing = true;
+    setTimeout(() => { state.autoAdvancing = false; next(); }, 1500);
+}
+
+// 统一监听封装
+function doListen(btnId, targets, cb) {
+    const btn = $(btnId);
+    const origClass = btn.className;
+    btn.className = origClass + ' rec';
+    btn.disabled = true;
+    Voice.listen('zh-CN', (heard) => {
+        btn.className = origClass;
+        btn.disabled = false;
+        const ok = scoreAny(targets, heard);
+        cb(ok, heard);
+    });
+}
+
+function refreshTop() {
+    const stars = Store.get('learn_stars', 0);
+    const prog = Store.get('learn_progress', { chinese:0, pinyin:0, math:0, english:0 });
+    $('top-bar').innerHTML = `
+        <span class="info">第 ${state.idx + 1} / ${LESSONS.length} 课</span>
+        <span class="tag">${LESSONS[state.idx].t}</span>
+        <span class="spacer"></span>
+        <span class="progress-mini">拼音 ${prog.pinyin} / 63</span>
+        <span class="stars">⭐ ${stars}</span>
+    `;
+}
+
+function prev() {
+    if (state.idx > 0) { state.idx--; render(); }
+}
+function next() {
+    if (state.idx < LESSONS.length - 1) { state.idx++; render(); }
+    else { setFeedback('ok', '🎓 全部 35 课学完，你已是拼音小达人！'); }
+}
+
+// 从错题优先进入（如有拼音错题则跳到相关课）
+function startFromWrongOrDefault() {
+    const wrong = Store.get('learn_wrong', []).filter(x => x.module === 'pinyin');
+    if (wrong.length) {
+        const m = wrong[0].id.match(/^L(\d+)-/);
+        if (m) state.idx = Math.min(LESSONS.length - 1, parseInt(m[1], 10));
+    }
+    render();
+}
+
+// 启动
+startFromWrongOrDefault();
+</script>
+</body>
+</html>

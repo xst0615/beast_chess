@@ -19,6 +19,7 @@
 | `focus_training.html` | 专注力训练（舒尔特方格 / 翻牌配对 / 反应速度 / Stroop 字色干扰 四合一，难度递进） |
 | `maze_game.html` | 迷宫探险（4 档难度，收集星星通关，键盘/触屏/拖拽多种操作） |
 | `software_designer_quiz.html` | 软件设计师答题通（综合知识/设计分析/程序设计/应用技术 4 大题型，练习/模拟考试/错题本 3 种模式） |
+| `learning_hub.html` | 幼升小学习中心（识字/拼音/数学思维/英语 4 模块 155 课，TTS 朗读+语音识别跟读，星星/等级/勋章/打卡/错题本激励系统） |
 
 ### 工具与内容页
 
@@ -94,6 +95,11 @@ npm start
 ├── focus_training.html     # 专注力训练（四合一）
 ├── maze_game.html          # 迷宫探险
 ├── software_designer_quiz.html  # 软件设计师答题通
+├── learning_hub.html        # 幼升小学习中心（主入口）
+├── chinese_chars.html       # 识字模块（40 课/100 字）
+├── pinyin.html              # 拼音模块（35 课/63 拼音）
+├── math_thinking.html       # 数学思维模块（40 课/6 大类）
+├── english.html             # 英语模块（40 课/字母+单词+问候）
 ├── agnes_video.html        # 视频生成工作台
 ├── article_shuixiang.html  # 文章页
 ├── media_hub/              # 自媒体发布工具

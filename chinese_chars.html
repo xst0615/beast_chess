@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>识字学习</title>
+<style>
+    :root { --main:#e91e63; --bg1:#fff3e0; --bg2:#fce4ec; --accent:#ff80ab; --ink:#333; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+        font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+        background:linear-gradient(135deg,var(--bg1) 0%,var(--bg2) 100%);
+        min-height:100vh; padding:12px 12px 30px;
+        display:flex; flex-direction:column; align-items:center;
+        color:var(--ink);
+    }
+    /* 顶部栏 */
+    .topbar {
+        width:100%; max-width:680px; display:flex; justify-content:space-between; align-items:center;
+        gap:8px; margin-bottom:10px; flex-wrap:wrap;
+    }
+    .meta { background:#fff; border-radius:20px; padding:6px 14px; font-size:13px; color:#555;
+        box-shadow:0 2px 6px rgba(0,0,0,0.08); display:flex; gap:10px; flex-wrap:wrap; }
+    .meta b { color:var(--main); }
+    .topright { display:flex; gap:6px; }
+    .pill {
+        background:#fff; color:var(--main); text-decoration:none; font-size:13px;
+        padding:6px 12px; border-radius:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1);
+        border:none; cursor:pointer; font-family:inherit; white-space:nowrap;
+    }
+    .pill:hover { background:#fce4ec; }
+
+    /* 卡片 */
+    .card {
+        width:100%; max-width:680px; background:#fff; border-radius:20px;
+        padding:18px 16px 22px; box-shadow:0 6px 18px rgba(233,30,99,0.12);
+        display:flex; flex-direction:column; align-items:center; gap:12px;
+    }
+    .lesson-tag { font-size:13px; color:#888; }
+    .lesson-tag b { color:var(--main); }
+    .review-flag { background:#fff3e0; color:#f4511e; font-size:12px; padding:3px 10px; border-radius:12px; border:1px solid #ffccbc; }
+
+    .big-char {
+        font-size:clamp(96px,26vw,128px); line-height:1; color:var(--ink); font-weight:500;
+        text-shadow:1px 2px 0 #fff, 2px 3px 8px rgba(233,30,99,0.15);
+    }
+    .pinyin { font-size:26px; color:var(--main); letter-spacing:3px; font-weight:600; }
+    .stroke-box { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .stroke-box svg { width:170px; height:170px; background:#fff8e1; border:2px dashed #ffcc80; border-radius:12px; }
+    .stroke-tip { font-size:11px; color:#999; }
+
+    .order { font-size:13px; color:#666; background:#fafafa; border-radius:10px; padding:6px 12px; }
+    .order b { color:var(--main); }
+
+    .section-title { font-size:13px; color:#888; align-self:flex-start; margin-left:6px; }
+    .word-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+    .word-btn, .sent-btn {
+        background:#fff3e0; color:#333; border:2px solid #ffcc80; border-radius:14px;
+        padding:10px 14px; font-size:16px; cursor:pointer; font-family:inherit;
+        display:flex; align-items:center; gap:6px; min-height:48px;
+    }
+    .word-btn:hover, .sent-btn:hover { background:#ffe0b2; }
+    .sent-btn { width:100%; justify-content:center; }
+    .sent-btn .txt { flex:1; text-align:left; }
+
+    /* 主操作 */
+    .ops { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; }
+    @media (max-width:420px){ .ops{ grid-template-columns:1fr; } }
+    .op-btn {
+        border:none; border-radius:16px; padding:18px 10px; font-size:20px; font-weight:bold;
+        cursor:pointer; font-family:inherit; min-height:56px; display:flex; align-items:center; justify-content:center; gap:8px;
+        box-shadow:0 4px 12px rgba(0,0,0,0.12); transition:transform .12s;
+    }
+    .op-btn:active { transform:scale(.97); }
+    .op-listen { background:linear-gradient(135deg,#7c4dff,#5e35ff); color:#fff; }
+    .op-read { background:linear-gradient(135deg,var(--accent),var(--main)); color:#fff; }
+    .op-read.busy { background:linear-gradient(135deg,#bdbdbd,#9e9e9e); }
+
+    .feedback {
+        min-height:36px; font-size:18px; font-weight:bold; display:flex; align-items:center; gap:6px;
+        color:var(--main);
+    }
+    .hint { font-size:12px; color:#999; text-align:center; max-width:560px; }
+
+    /* 导航 */
+    .nav { width:100%; max-width:680px; display:flex; gap:10px; margin-top:12px; }
+    .nav button {
+        flex:1; min-height:48px; border:none; border-radius:14px; font-size:16px; cursor:pointer;
+        font-family:inherit; background:#fff; color:var(--main); box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    }
+    .nav button:active { background:#fce4ec; }
+    .nav .fav.on { background:#fff59d; color:#f57f17; }
+
+    /* 课程列表 */
+    .lessonlist { width:100%; max-width:680px; background:#fff; border-radius:16px; padding:14px;
+        box-shadow:0 4px 12px rgba(0,0,0,0.08); margin-top:12px; }
+    .lessonlist h3 { color:var(--main); font-size:15px; margin-bottom:10px; }
+    .ll-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+    @media (max-width:480px){ .ll-grid{ grid-template-columns:repeat(4,1fr); } }
+    .ll-cell {
+        background:#f5f5f5; border:2px solid transparent; border-radius:10px; padding:8px 4px;
+        text-align:center; cursor:pointer; font-size:18px; font-family:inherit; color:#555;
+    }
+    .ll-cell:hover { background:#fff3e0; }
+    .ll-cell.cur { border-color:var(--main); background:#fce4ec; }
+    .ll-cell.done { background:#e8f5e9; color:#2e7d32; }
+    .ll-cell .ln { display:block; font-size:10px; color:#999; }
+    .tip { font-size:12px; color:#888; text-align:center; margin-top:14px; max-width:560px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="meta" id="meta"></div>
+    <div class="topright">
+        <button class="pill" id="menuBtn" type="button">📋 课程</button>
+        <a class="pill" href="learning_hub.html">← 返回</a>
+    </div>
+</div>
+
+<div class="card" id="card"></div>
+<div class="nav">
+    <button id="prevBtn" type="button">⬅ 上一字</button>
+    <button class="fav" id="favBtn" type="button">📌 收藏</button>
+    <button id="nextBtn" type="button">下一字 ➡</button>
+</div>
+<div class="lessonlist" id="lessonlist" hidden>
+    <h3>📚 全部 40 课（点击跳转）</h3>
+    <div class="ll-grid" id="llGrid"></div>
+</div>
+<div class="tip">💡 用 Chrome 打开，点「我来读」跟读。读对得 ⭐，连续读对解锁勋章。每日坚持 15 分钟！</div>
+
+<script>
+/* ================= 共享存储 ================= */
+const Store = {
+    get(k, def){ try{ const v = JSON.parse(localStorage.getItem(k)); return v === null ? def : v; }catch(e){ return def; } },
+    set(k, v){ localStorage.setItem(k, JSON.stringify(v)); },
+};
+function addStar(n){ Store.set('learn_stars', Store.get('learn_stars', 0) + n); }
+function getLearned(){ return Store.get('learn_chinese_learned', []); }
+function setLearned(a){ Store.set('learn_chinese_learned', a); }
+function syncProgress(){ const p = Store.get('learn_progress', {chinese:0,pinyin:0,math:0,english:0}); p.chinese = getLearned().length; Store.set('learn_progress', p); }
+function dailyCheckin(){
+    const s = Store.get('learn_streak', {days:0, lastDate:null});
+    const today = new Date().toDateString();
+    if (s.lastDate === today) return;
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    s.days = (s.lastDate === yesterday) ? s.days + 1 : 1;
+    s.lastDate = today;
+    Store.set('learn_streak', s);
+}
+function awardBadge(id){ const b = Store.get('learn_badges', []); if(!b.includes(id)){ b.push(id); Store.set('learn_badges', b); } }
+function wrongList(){ return Store.get('learn_wrong', []).filter(x => x.module === 'chinese'); }
+function addWrong(id){
+    const w = Store.get('learn_wrong', []);
+    if(!w.find(x => x.module==='chinese' && x.id===id)){ w.push({module:'chinese', id, addedAt:Date.now()}); Store.set('learn_wrong', w); }
+}
+function removeWrong(id){
+    const w = Store.get('learn_wrong', []).filter(x => !(x.module==='chinese' && x.id===id));
+    Store.set('learn_wrong', w);
+}
+function isWrong(id){ return wrongList().some(x => x.id === id); }
+function getFav(){ return Store.get('learn_chinese_fav', []); }
+function toggleFav(id){
+    let f = getFav();
+    if(f.includes(id)) f = f.filter(x => x !== id); else f.push(id);
+    Store.set('learn_chinese_fav', f);
+    return f.includes(id);
+}
+
+/* ================= 语音工具 ================= */
+const Voice = {
+    speak(text, lang = 'zh-CN', rate = 0.9){
+        if(!('speechSynthesis' in window)){ alert('您的浏览器不支持语音朗读，请用 Chrome'); return false; }
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang; u.rate = rate;
+        window.speechSynthesis.speak(u);
+        return true;
+    },
+    listen(lang = 'zh-CN', onResult, onEnd){
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(!SR){ alert('您的浏览器不支持语音识别，请用 Chrome 浏览器'); onResult(null); return false; }
+        const r = new SR();
+        r.lang = lang; r.continuous = false; r.interimResults = false; r.maxAlternatives = 3;
+        r.onresult = e => onResult(e.results[0][0].transcript);
+        r.onerror = () => onResult(null);
+        r.onend = () => onEnd && onEnd();
+        r.start();
+        return true;
+    },
+    score(target, heard){
+        if(!heard) return 0;
+        if(heard.includes(target) || target.includes(heard)) return 2;
+        const t = [...target], h = [...heard];
+        const common = t.filter(c => h.includes(c)).length;
+        return common / Math.max(1, t.length) > 0.5 ? 1 : 0;
+    }
+};
+
+/* ================= 字库 40 课 100 字 ================= */
+/* 每个字：c 字, p 拼音, w[组词2], s 例句, o 笔顺文字 */
+const LESSONS = [
+ [ // L1
+  {c:'一',p:'yī',w:['一个','一起'],s:'我们一起做游戏。',o:'横'},
+  {c:'二',p:'èr',w:['二人','第二'],s:'我有两只手。',o:'横、横'},
+  {c:'三',p:'sān',w:['三个','三月'],s:'三个小朋友在玩。',o:'横、横、横'},
+ ],[ // L2
+  {c:'四',p:'sì',w:['四个','四方'],s:'桌子有四条腿。',o:'竖、横折、撇、竖弯、横'},
+  {c:'五',p:'wǔ',w:['五个','五星'],s:'五颗星星亮闪闪。',o:'横、竖、横折、横'},
+ ],[ // L3
+  {c:'上',p:'shàng',w:['上下','上面'],s:'书放在桌子上。',o:'竖、横、横'},
+  {c:'下',p:'xià',w:['上下','下面'],s:'猫在桌子下。',o:'横、竖、点'},
+ ],[ // L4
+  {c:'左',p:'zuǒ',w:['左右','左手'],s:'我用左手写字。',o:'横、撇、横、竖、横'},
+  {c:'右',p:'yòu',w:['左右','右手'],s:'我用右手拿笔。',o:'横、撇、竖、横折、横'},
+ ],[ // L5
+  {c:'日',p:'rì',w:['日月','生日'],s:'今天是我的生日。',o:'竖、横折、横、横'},
+  {c:'月',p:'yuè',w:['月亮','月牙'],s:'天上一个月亮。',o:'撇、横折钩、横、横'},
+ ],[ // L6
+  {c:'水',p:'shuǐ',w:['水果','喝水'],s:'我爱喝水。',o:'竖钩、横撇、撇、捺'},
+  {c:'火',p:'huǒ',w:['火车','大火'],s:'火车开得快。',o:'点、撇、撇、捺'},
+ ],[ // L7
+  {c:'山',p:'shān',w:['山上','高山'],s:'高山上有树。',o:'竖、竖折、竖'},
+  {c:'石',p:'shí',w:['石头','石子'],s:'路上有石头。',o:'横、撇、竖、横折、横'},
+ ],[ // L8
+  {c:'田',p:'tián',w:['田地','稻田'],s:'田里有稻子。',o:'竖、横折、横、竖、横'},
+  {c:'土',p:'tǔ',w:['土地','泥土'],s:'地上有泥土。',o:'横、竖、横'},
+ ],[ // L9
+  {c:'人',p:'rén',w:['大人','人口'],s:'大人在工作。',o:'撇、捺'},
+  {c:'口',p:'kǒu',w:['开口','人口'],s:'嘴巴是口。',o:'竖、横折、横'},
+ ],[ // L10
+  {c:'手',p:'shǒu',w:['双手','洗手'],s:'饭前要洗手。',o:'撇、横、横、竖钩'},
+  {c:'目',p:'mù',w:['目光','耳目'],s:'眼睛是目。',o:'竖、横折、横、横、横'},
+ ],[ // L11
+  {c:'耳',p:'ěr',w:['耳朵','耳机'],s:'耳朵能听声音。',o:'横、竖、竖、横、横、横、竖'},
+  {c:'头',p:'tóu',w:['头发','木头'],s:'头上有头发。',o:'点、点、横、撇、点'},
+  {c:'足',p:'zú',w:['双足','足球'],s:'我踢足球。',o:'竖、横折、横、撇、捺'},
+ ],[ // L12
+  {c:'立',p:'lì',w:['起立','站立'],s:'老师好,请起立。',o:'点、横、撇、横、横、横、竖'},
+  {c:'坐',p:'zuò',w:['坐下','请坐'],s:'请坐下。',o:'撇、点、撇、捺、横、竖、横'},
+  {c:'行',p:'xíng',w:['行走','排队行'],s:'我们排队行进。',o:'撇、撇、竖、横、横、竖'},
+ ],[ // L13
+  {c:'大',p:'dà',w:['大人','大小'],s:'大人有大手。',o:'横、撇、捺'},
+  {c:'小',p:'xiǎo',w:['小孩','大小'],s:'小孩在玩。',o:'竖钩、撇、点'},
+  {c:'多',p:'duō',w:['多少','很多'],s:'很多花开了。',o:'撇、竖、横折、横、撇、横撇、点'},
+ ],[ // L14
+  {c:'少',p:'shǎo',w:['多少','很少'],s:'很少有人来。',o:'竖、撇、点、撇'},
+  {c:'前',p:'qián',w:['前后','前面'],s:'前面有车。',o:'点、撇、横、竖、横折、横、竖'},
+  {c:'后',p:'hòu',w:['前后','后面'],s:'后面有人。',o:'撇、撇、横、竖、横折、横、竖'},
+ ],[ // L15
+  {c:'东',p:'dōng',w:['东西','东方'],s:'太阳从东方升起。',o:'横、撇、竖钩、撇、点'},
+  {c:'西',p:'xī',w:['东西','西方'],s:'太阳落向西方。',o:'横、竖、横折、撇、竖弯、横'},
+  {c:'南',p:'nán',w:['南北','南方'],s:'南方天气热。',o:'横、竖、横折、横、竖、竖、横'},
+ ],[ // L16
+  {c:'北',p:'běi',w:['南北','北方'],s:'北方天气冷。',o:'竖、横、横、提、撇、竖弯钩'},
+  {c:'木',p:'mù',w:['木头','树木'],s:'树木真多。',o:'横、竖、撇、捺'},
+  {c:'林',p:'lín',w:['树林','森林'],s:'树林里有鸟。',o:'横、竖、撇、点、横、竖、撇、点'},
+ ],[ // L17
+  {c:'禾',p:'hé',w:['禾苗','禾田'],s:'田里有禾苗。',o:'撇、横、竖、撇、捺'},
+  {c:'米',p:'mǐ',w:['大米','玉米'],s:'我吃大米饭。',o:'点、撇、横、竖、撇、捺'},
+  {c:'虫',p:'chóng',w:['虫子','小虫'],s:'虫子在爬。',o:'竖、横折、横、横、竖、提、撇、点'},
+ ],[ // L18
+  {c:'鱼',p:'yú',w:['小鱼','鱼儿'],s:'小鱼在游。',o:'撇、横撇、竖、横折、横、竖、横、横'},
+  {c:'鸟',p:'niǎo',w:['小鸟','飞鸟'],s:'小鸟会飞。',o:'撇、竖、横折、横、竖、横折、横'},
+  {c:'马',p:'mǎ',w:['小马','上马'],s:'马儿跑得快。',o:'横、竖、横折、横、竖折折钩、横'},
+ ],[ // L19
+  {c:'牛',p:'niú',w:['小牛','水牛'],s:'牛在吃草。',o:'撇、横、横、竖'},
+  {c:'羊',p:'yáng',w:['小羊','山羊'],s:'羊吃青草。',o:'点、撇、横、横、撇、横、横、竖'},
+  {c:'草',p:'cǎo',w:['青草','草地'],s:'地上有青草。',o:'横、竖、竖、竖、横折、横、横、竖、横'},
+ ],[ // L20
+  {c:'花',p:'huā',w:['花朵','开花'],s:'花开了。',o:'横、竖、竖、撇、竖、撇、竖弯钩'},
+  {c:'雨',p:'yǔ',w:['下雨','雨水'],s:'下雨了。',o:'横、竖、竖、横折钩、竖、点、点、点、点'},
+  {c:'风',p:'fēng',w:['大风','刮风'],s:'大风刮来。',o:'撇、横、竖、竖、横、撇、横、竖弯钩'},
+ ],[ // L21
+  {c:'云',p:'yún',w:['白云','云朵'],s:'天上有白云。',o:'横、横、撇折、点'},
+  {c:'电',p:'diàn',w:['电视','用电'],s:'电视开着。',o:'竖、横折、横、横、竖弯钩'},
+  {c:'天',p:'tiān',w:['天空','今天'],s:'今天天气好。',o:'横、横、撇、捺'},
+ ],[ // L22
+  {c:'地',p:'dì',w:['地上','土地'],s:'地上有花。',o:'横、竖、提、竖、横折、竖弯钩'},
+  {c:'星',p:'xīng',w:['星星','繁星'],s:'星星亮了。',o:'竖、横折、横、横、横、竖、横、横'},
+  {c:'光',p:'guāng',w:['光明','阳光'],s:'阳光很亮。',o:'竖、点、撇、横、撇、竖弯钩、撇、捺'},
+ ],[ // L23
+  {c:'子',p:'zǐ',w:['孩子','儿子'],s:'孩子在玩。',o:'横撇、竖钩、横'},
+  {c:'女',p:'nǚ',w:['女儿','女孩'],s:'女孩在唱歌。',o:'撇点、撇、横'},
+  {c:'父',p:'fù',w:['父母','父亲'],s:'父母爱我。',o:'撇、点、撇、捺'},
+ ],[ // L24
+  {c:'母',p:'mǔ',w:['母亲','父母'],s:'母亲很爱我。',o:'竖、横折、横、点、横、点、横'},
+  {c:'男',p:'nán',w:['男孩','男女'],s:'男孩在跑。',o:'竖、横折、横、竖、横折、横、竖'},
+  {c:'老',p:'lǎo',w:['老师','老人'],s:'老师教我们。',o:'横、竖、横、撇、竖弯钩、撇、捺'},
+ ],[ // L25
+  {c:'哥',p:'gē',w:['哥哥','大哥'],s:'哥哥上学了。',o:'横、竖、横折、横、竖、横折、横、竖钩'},
+  {c:'弟',p:'dì',w:['弟弟','兄弟'],s:'弟弟还小。',o:'点、撇、横折、横、竖、竖、横折、横、竖'},
+  {c:'长',p:'cháng',w:['长短','长江'],s:'长江很长。',o:'撇、横、竖提、捺'},
+ ],[ // L26
+  {c:'短',p:'duǎn',w:['长短','短小'],s:'这笔很短。',o:'撇、横、横、横、竖、横折、横、竖、横折、横、竖、横'},
+  {c:'高',p:'gāo',w:['高低','高山'],s:'高山很高。',o:'点、横、竖、横折、横、竖、横折、竖、横折、横'},
+  {c:'低',p:'dī',w:['高低','低头'],s:'不要低头写字。',o:'撇、竖、撇、竖提、横、斜钩、撇、点'},
+ ],[ // L27
+  {c:'远',p:'yuǎn',w:['远近','很远'],s:'他家很远。',o:'横、竖、横、横、竖、竖、横折、横、竖弯钩'},
+  {c:'近',p:'jìn',w:['远近','很近'],s:'学校很近。',o:'撇、捺、横、竖、竖、横折、横、横、横'},
+  {c:'来',p:'lái',w:['来去','过来'],s:'妈妈过来了。',o:'横、点、撇、横、竖、撇、捺'},
+ ],[ // L28
+  {c:'去',p:'qù',w:['来去','出去'],s:'我们出去玩。',o:'横、竖、横、撇、撇、横撇、捺'},
+  {c:'出',p:'chū',w:['出入','出来'],s:'太阳出来了。',o:'竖折、竖、横折、竖、竖'},
+  {c:'入',p:'rù',w:['出入','进入'],s:'进入教室。',o:'撇、捺'},
+ ],[ // L29
+  {c:'开',p:'kāi',w:['开关','开门'],s:'请开门。',o:'横、横、撇、竖'},
+  {c:'关',p:'guān',w:['开关','关门'],s:'关上门。',o:'点、撇、横、横、撇、捺、横、竖、横、横'},
+  {c:'好',p:'hǎo',w:['好人','好玩'],s:'这个游戏好玩。',o:'撇点、撇、横、横、竖钩、横、撇、横、横'},
+ ],[ // L30
+  {c:'书',p:'shū',w:['读书','书本'],s:'我爱读书。',o:'横折、横、竖钩、点'},
+  {c:'本',p:'běn',w:['本子','书本'],s:'这是我的本子。',o:'横、竖、撇、捺、横、横'},
+ ],[ // L31
+  {c:'笔',p:'bǐ',w:['铅笔','毛笔'],s:'我用铅笔写字。',o:'撇、横、横、横、竖、横、竖折折钩、竖'},
+  {c:'画',p:'huà',w:['画画','图画'],s:'我爱画画。',o:'横、竖、横折、横、竖、横、竖、横折、横、横'},
+ ],[ // L32
+  {c:'红',p:'hóng',w:['红色','红花'],s:'红花开了。',o:'撇折、撇折、提、横、竖、横、横'},
+  {c:'黄',p:'huáng',w:['黄色','金黄'],s:'金黄的稻子。',o:'横、竖、竖、横、横、竖、横折、横、竖、横、撇、点'},
+ ],[ // L33
+  {c:'蓝',p:'lán',w:['蓝色','蓝天'],s:'蓝天上有云。',o:'横、竖、竖、竖、横折、横、竖、横'},
+  {c:'绿',p:'lǜ',w:['绿色','绿草'],s:'绿草真美。',o:'撇折、撇折、提、横折、横、竖、撇、点、竖、横、撇、捺'},
+ ],[ // L34
+  {c:'白',p:'bái',w:['白色','白云'],s:'白云在天上。',o:'撇、竖、横折、横、横'},
+  {c:'黑',p:'hēi',w:['黑色','黑板'],s:'黑板是黑色。',o:'竖、横折、点、撇、横、横、横、点、点、点、点、横、竖、横、横、横'},
+ ],[ // L35
+  {c:'春',p:'chūn',w:['春天','春风'],s:'春天来了。',o:'横、横、横、撇、捺、竖、横折、横、横'},
+  {c:'夏',p:'xià',w:['夏天','盛夏'],s:'夏天很热。',o:'横、竖、横折、横、横、竖、横、撇、捺、撇、竖弯钩'},
+ ],[ // L36
+  {c:'秋',p:'qiū',w:['秋天','秋风'],s:'秋天到了。',o:'撇、横、竖、撇、点、点、撇、撇、捺、横、竖、横'},
+  {c:'冬',p:'dōng',w:['冬天','寒冬'],s:'冬天很冷。',o:'撇、横撇、捺、点、点、点、点、横、竖、横折、横、横'},
+ ],[ // L37
+  {c:'加',p:'jiā',w:['加法','加上'],s:'一加一得二。',o:'横折、竖、撇、横、竖、横折、横、竖'},
+  {c:'减',p:'jiǎn',w:['减法','减去'],s:'三减一得二。',o:'点、提、横、竖、横折、横、竖、横、撇、捺、点、竖、横、横'},
+ ],[ // L38
+  {c:'个',p:'gè',w:['一个','几个'],s:'一个小朋友。',o:'撇、捺、竖、横'},
+  {c:'百',p:'bǎi',w:['一百','百分'],s:'一百分真棒。',o:'横、撇、竖、横折、横、横、横'},
+ ],[ // L39
+  {c:'千',p:'qiān',w:['一千','千万'],s:'千万别迟到。',o:'撇、横、横、竖'},
+  {c:'万',p:'wàn',w:['千万','一万'],s:'一万分谢谢。',o:'横、横折钩、撇、竖弯钩'},
+ ],[ // L40
+  {c:'你',p:'nǐ',w:['你好','你们'],s:'你好小朋友。',o:'撇、竖、撇、横撇、竖钩、撇、点'},
+  {c:'我',p:'wǒ',w:['我们','自我'],s:'我们一起玩。',o:'撇、横、竖钩、提、斜钩、撇、点'},
+ ],
+];
+
+/* 字 id 与全局索引映射 */
+const FLAT = []; // {c,p,w,s,o, l, ci, gid}
+LESSONS.forEach((arr, li) => arr.forEach((ch, ci) => {
+    const gid = 'char-' + String(FLAT.length + 1).padStart(3, '0');
+    FLAT.push(Object.assign({}, ch, { l: li, ci, gid }));
+}));
+const ID2POS = {}; FLAT.forEach(o => ID2POS[o.gid] = o);
+
+/* SVG 笔顺（7 个高频字：一、二、三、人、口、日、月） */
+const STROKES = {
+    '一': [{d:'M20 100 L180 100'}],
+    '二': [{d:'M55 70 L145 70'},{d:'M20 135 L180 135'}],
+    '三': [{d:'M70 55 L130 55'},{d:'M30 100 L170 100'},{d:'M20 145 L180 145'}],
+    '人': [{d:'M100 25 Q70 100 35 175'},{d:'M100 70 Q130 120 170 175'}],
+    '口': [{d:'M55 45 L55 155'},{d:'M55 45 L145 45 L145 155'},{d:'M55 155 L145 155'}],
+    '日': [{d:'M50 35 L50 165'},{d:'M50 35 L150 35 L150 165'},{d:'M50 100 L150 100'},{d:'M50 165 L150 165'}],
+    '月': [{d:'M75 30 Q65 100 60 170'},{d:'M75 30 L150 30 L150 160 L145 168'},{d:'M75 95 L150 95'},{d:'M75 140 L150 140'}],
+};
+const COLORS = ['#e91e63','#3f51b5','#009688','#ff9800','#795548','#9c27b0','#43a047','#00bcd4'];
+function strokeSVG(ch){
+    const data = STROKES[ch];
+    if(!data) return '';
+    let inner = '';
+    data.forEach((s, i) => {
+        const col = COLORS[i % COLORS.length];
+        inner += `<path d="${s.d}" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+        const m = s.d.match(/M([\d.]+)\s+([\d.]+)/);
+        if(m){
+            const x = +m[1], y = +m[2];
+            inner += `<circle cx="${x}" cy="${y}" r="13" fill="#fff" stroke="${col}" stroke-width="2"/>`;
+            inner += `<text x="${x}" y="${y+5}" text-anchor="middle" font-size="16" font-weight="bold" fill="${col}">${i+1}</text>`;
+        }
+    });
+    return `<div class="stroke-box"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${inner}</svg><div class="stroke-tip">不同颜色表示笔顺，数字为先后</div></div>`;
+}
+
+/* ================= 状态 ================= */
+let pos = Store.get('learn_chinese_pos', { l: 0, c: 0 });
+if(!LESSONS[pos.l] || !LESSONS[pos.l][pos.c]) pos = { l: 0, c: 0 };
+let reviewMode = false;
+let advanceTimer = null;
+const $ = id => document.getElementById(id);
+
+function curChar(){ return LESSONS[pos.l][pos.c]; }
+function curGid(){ const f = FLAT.find(o => o.l === pos.l && o.ci === pos.c); return f ? f.gid : null; }
+
+/* 进入时若存在错题，跳到第一个错题 */
+(function initReview(){
+    const w = wrongList();
+    if(w.length){
+        const p = ID2POS[w[0].id];
+        if(p){ pos = { l: p.l, c: p.ci }; reviewMode = true; }
+    }
+})();
+
+function savePos(){ Store.set('learn_chinese_pos', pos); }
+
+function render(){
+    const ch = curChar();
+    const gid = curGid();
+    const learned = getLearned();
+    const stars = Store.get('learn_stars', 0);
+    const fav = getFav();
+    const wrong = isWrong(gid);
+
+    $('meta').innerHTML =
+        `第 <b>${pos.l + 1}</b>/40 课 · 已学 <b>${learned.length}</b> 字 · ⭐ <b>${stars}</b> · 📌 <b>${fav.length}</b>` +
+        (reviewMode ? ` · <span class="review-flag">错题复习中</span>` : '');
+
+    const isNew = !learned.includes(gid);
+    $('card').innerHTML = `
+        <div class="lesson-tag">第 <b>${pos.l+1}</b> 课 · ${isNew ? '新字' : '复习'} ${reviewMode ? '<span class="review-flag">错题</span>' : ''}</div>
+        <div class="big-char">${ch.c}</div>
+        <div class="pinyin">${ch.p}</div>
+        ${strokeSVG(ch.c)}
+        <div class="order"><b>笔顺：</b>${ch.o}</div>
+        <div class="section-title">📖 组词（点 🔊 朗读）</div>
+        <div class="word-row">
+            <button class="word-btn" data-w="${ch.w[0]}">${ch.w[0]} 🔊</button>
+            <button class="word-btn" data-w="${ch.w[1]}">${ch.w[1]} 🔊</button>
+        </div>
+        <div class="section-title">✏️ 例句</div>
+        <button class="sent-btn" data-sent="1"><span class="txt">${ch.s}</span> 🔊</button>
+        <div class="ops">
+            <button class="op-btn op-listen" id="listenBtn">🔊 听字音</button>
+            <button class="op-btn op-read" id="readBtn">🎤 我来读</button>
+        </div>
+        <div class="feedback" id="feedback">${isNew ? '👆 点「听字音」再「我来读」跟读' : '继续练习，可重复读'}</div>
+        <div class="hint">${wrong ? '📌 此字在错题本中，读对即可移除' : ''}</div>
+    `;
+
+    // 绑定卡片内按钮
+    document.querySelectorAll('.word-btn').forEach(b => b.addEventListener('click', () => Voice.speak(b.dataset.w)));
+    const sb = document.querySelector('.sent-btn'); if(sb) sb.addEventListener('click', () => Voice.speak(ch.s));
+    $('listenBtn').addEventListener('click', () => Voice.speak(ch.c));
+    $('readBtn').addEventListener('click', startRead);
+
+    // 收藏按钮状态
+    const favBtn = $('favBtn');
+    if(fav.includes(gid)) favBtn.classList.add('on'); else favBtn.classList.remove('on');
+
+    renderLessonList();
+}
+
+function setFb(html){ $('feedback').innerHTML = html; }
+
+function startRead(){
+    const ch = curChar();
+    const btn = $('readBtn');
+    btn.classList.add('busy'); btn.textContent = '🎤 听讲中…';
+    setFb('🎤 请大声读出「' + ch.c + '」');
+    Voice.listen('zh-CN', heard => {
+        btn.classList.remove('busy'); btn.textContent = '🎤 我来读';
+        if(!heard){ setFb('🟡 没听清，请再试一次或点听字音'); return; }
+        const sc = Voice.score(ch.c, heard);
+        handleScore(sc, heard);
+    });
+}
+
+function handleScore(sc, heard){
+    const ch = curChar();
+    const gid = curGid();
+    if(sc === 2){
+        let earned = false;
+        // 移出错题
+        if(isWrong(gid)){ removeWrong(gid); }
+        // 新字 → 记已学 + 星 + 进度 + 打卡 + 勋章
+        const learned = getLearned();
+        if(!learned.includes(gid)){
+            learned.push(gid); setLearned(learned);
+            syncProgress();
+            addStar(1);
+            dailyCheckin();
+            if(learned.length >= 50) awardBadge('char_50');
+            earned = true;
+        }
+        setFb(earned ? '✅ 太棒了！+1 ⭐' : '✅ 太棒了！复习成功');
+        clearTimeout(advanceTimer);
+        advanceTimer = setTimeout(() => goNext(), 3000);
+    } else if(sc === 1){
+        setFb('🟡 差一点，再试一次（听到：' + heard + '）');
+    } else {
+        addWrong(gid);
+        setFb('❌ 没读对，已加入错题本（听到：' + heard + '）。可重试或跳过');
+    }
+}
+
+function goNext(){
+    clearTimeout(advanceTimer);
+    pos.c++;
+    if(pos.c >= LESSONS[pos.l].length){ pos.l++; pos.c = 0; }
+    if(pos.l >= LESSONS.length){ pos.l = 0; pos.c = 0; } // 学完循环
+    reviewMode = false; savePos(); render();
+    setTimeout(() => Voice.speak(curChar().c), 250);
+}
+function goPrev(){
+    clearTimeout(advanceTimer);
+    pos.c--;
+    if(pos.c < 0){ pos.l--; if(pos.l < 0) pos.l = LESSONS.length - 1; pos.c = LESSONS[pos.l].length - 1; }
+    reviewMode = false; savePos(); render();
+    setTimeout(() => Voice.speak(curChar().c), 250);
+}
+function jumpTo(l, c){
+    clearTimeout(advanceTimer);
+    pos = { l, c }; reviewMode = false; savePos();
+    $('lessonlist').hidden = true;
+    render();
+    setTimeout(() => Voice.speak(curChar().c), 250);
+}
+function toggleFavBtn(){
+    const on = toggleFav(curGid());
+    const b = $('favBtn'); if(on) b.classList.add('on'); else b.classList.remove('on');
+}
+
+function renderLessonList(){
+    const learned = getLearned();
+    const cells = LESSONS.map((arr, li) => {
+        const firstChar = arr[0].c;
+        const doneCount = arr.filter((_, ci) => learned.includes(FLAT.find(o => o.l === li && o.ci === ci).gid)).length;
+        const isCur = li === pos.l;
+        const cls = ['ll-cell' + (isCur ? ' cur' : '') + (doneCount === arr.length ? ' done' : '')];
+        return `<button class="${cls.join(' ')}" data-l="${li}"><span class="ln">${li+1}课 ${doneCount}/${arr.length}</span>${firstChar}</button>`;
+    }).join('');
+    $('llGrid').innerHTML = cells;
+    document.querySelectorAll('.ll-cell').forEach(b => b.addEventListener('click', () => jumpTo(+b.dataset.l, 0)));
+}
+
+/* 绑定 */
+$('prevBtn').addEventListener('click', goPrev);
+$('nextBtn').addEventListener('click', goNext);
+$('favBtn').addEventListener('click', toggleFavBtn);
+$('menuBtn').addEventListener('click', () => { const el = $('lessonlist'); el.hidden = !el.hidden; });
+
+/* 首次渲染 */
+render();
+setTimeout(() => Voice.speak(curChar().c), 400);
+</script>
+</body>
+</html>

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数学思维 · 40 课</title>
+<style>
+    :root {
+        --primary: #e91e63;
+        --primary-dark: #c2185b;
+        --bg: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%);
+        --card: #fff;
+        --success: #43a047;
+        --error: #e53935;
+        --accent: #ffca28;
+        --shadow: 0 4px 12px rgba(233,30,99,0.12);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        min-height: 100vh; padding: 12px 12px 28px;
+        display: flex; flex-direction: column; align-items: center;
+    }
+    .back-link {
+        position: absolute; top: 12px; left: 12px; color: var(--primary);
+        text-decoration: none; font-size: 14px; background: #fff;
+        padding: 7px 12px; border-radius: 20px; box-shadow: var(--shadow);
+        min-height: 32px; display: flex; align-items: center;
+    }
+    h1 {
+        color: var(--primary); font-size: 24px; margin: 10px 0 6px;
+        letter-spacing: 2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.08);
+    }
+    .progress-info {
+        font-size: 14px; color: #666; background: #fff; padding: 6px 14px;
+        border-radius: 20px; box-shadow: var(--shadow); margin-bottom: 12px;
+    }
+    .progress-info b { color: var(--primary); }
+    .progress-info .cat-name { color: var(--primary); font-weight: bold; }
+
+    .stage {
+        background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
+        padding: 18px 16px; width: 100%; max-width: 560px;
+        display: flex; flex-direction: column; align-items: center; gap: 12px;
+        border: 3px solid #f8bbd0;
+    }
+    .cat-tag {
+        align-self: flex-start; font-size: 13px; color: #fff; background: var(--primary);
+        padding: 5px 12px; border-radius: 14px; font-weight: bold;
+    }
+    .stem {
+        font-size: 19px; color: #333; text-align: center; line-height: 1.5;
+        font-weight: 600; word-break: break-word; width: 100%;
+    }
+    .emoji-box {
+        font-size: 42px; line-height: 1.4; text-align: center; min-height: 52px;
+        word-break: break-word; letter-spacing: 2px; color: var(--primary);
+        padding: 6px 4px; width: 100%;
+    }
+    .emoji-box.shape { font-size: 72px; line-height: 1.1; }
+    .emoji-box.small { font-size: 30px; }
+
+    .read-btn {
+        background: #fff3e0; color: var(--primary); border: 2px solid #ffcc80;
+        padding: 8px 16px; border-radius: 22px; font-size: 14px; font-weight: bold;
+        cursor: pointer; font-family: inherit; min-height: 40px;
+        transition: all 0.15s;
+    }
+    .read-btn:hover { background: #ffe0b2; transform: translateY(-1px); }
+    .read-btn:active { transform: translateY(0); }
+
+    .options {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+        width: 100%;
+    }
+    .opt {
+        background: #fff; border: 3px solid #f0f0f0; border-radius: 14px;
+        padding: 14px 8px; font-size: 20px; font-weight: bold; color: #333;
+        cursor: pointer; font-family: inherit; min-height: 56px;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        transition: all 0.15s; line-height: 1.3;
+    }
+    .opt:hover { border-color: var(--primary); background: #fce4ec; transform: translateY(-1px); }
+    .opt:active { transform: translateY(0); }
+    .opt .spk { font-size: 15px; opacity: 0.55; }
+    .opt.correct { border-color: var(--success); background: #c8e6c9; color: #2e7d32; }
+    .opt.wrong { border-color: var(--error); background: #ffcdd2; color: #c62828; animation: shake 0.4s; }
+    .opt.disabled { opacity: 0.6; cursor: default; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+    .feedback {
+        font-size: 18px; font-weight: bold; min-height: 26px; text-align: center;
+    }
+    .feedback.ok { color: var(--success); }
+    .feedback.no { color: var(--error); }
+
+    .after-correct {
+        display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    }
+    .after-correct button {
+        border: none; border-radius: 22px; padding: 10px 16px; font-size: 15px;
+        font-weight: bold; cursor: pointer; font-family: inherit; min-height: 48px;
+        transition: all 0.15s;
+    }
+    .btn-answer { background: var(--accent); color: #5d4037; }
+    .btn-answer:hover { background: #ffb300; transform: translateY(-1px); }
+    .btn-mic { background: #ba68c8; color: #fff; }
+    .btn-mic:hover { background: #9c27b0; transform: translateY(-1px); }
+    .btn-mic.rec { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+    .nav {
+        display: flex; gap: 10px; width: 100%; max-width: 560px; margin-top: 14px;
+    }
+    .nav button {
+        flex: 1; border: none; border-radius: 14px; padding: 14px; font-size: 16px;
+        font-weight: bold; cursor: pointer; font-family: inherit; min-height: 52px;
+        transition: all 0.15s;
+    }
+    .btn-prev { background: #eceff1; color: #555; }
+    .btn-prev:hover { background: #cfd8dc; }
+    .btn-next { background: var(--primary); color: #fff; }
+    .btn-next:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-next:disabled, .btn-prev:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .stats {
+        margin-top: 12px; font-size: 14px; color: #666; background: #fff;
+        padding: 8px 16px; border-radius: 20px; box-shadow: var(--shadow);
+    }
+    .stats b { color: var(--primary); }
+
+    .badge-done {
+        font-size: 12px; color: var(--success); background: #e8f5e9;
+        padding: 3px 10px; border-radius: 12px; align-self: flex-start; font-weight: bold;
+    }
+    .tip { font-size: 12px; color: #aaa; text-align: center; margin-top: 8px; max-width: 560px; }
+    .lesson-dots {
+        display: flex; flex-wrap: wrap; gap: 4px; justify-content: center;
+        max-width: 560px; margin-top: 10px;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: #e0e0e0; }
+    .dot.done { background: var(--success); }
+    .dot.cur { background: var(--primary); transform: scale(1.3); }
+    .dot.wrong { background: var(--error); }
+
+    @media (max-width: 380px) {
+        .options { grid-template-columns: 1fr; }
+        .stem { font-size: 17px; }
+        .emoji-box { font-size: 36px; }
+        .emoji-box.shape { font-size: 60px; }
+    }
+</style>
+</head>
+<body>
+<a href="learning_hub.html" class="back-link">← 学习中心</a>
+<h1>🔢 数学思维</h1>
+<div class="progress-info">第 <b id="cur-no">1</b> / 40 课 · <span class="cat-name" id="cur-cat">数感</span></div>
+
+<div class="stage">
+    <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+        <span class="cat-tag" id="cat-tag">🔢 数感</span>
+        <span class="badge-done" id="badge-done" style="display:none">✅ 已完成</span>
+    </div>
+    <div class="stem" id="stem"></div>
+    <div class="emoji-box" id="emoji-box"></div>
+    <button class="read-btn" onclick="readStem()">🔊 朗读题目</button>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback"></div>
+    <div class="after-correct" id="after-correct" style="display:none">
+        <button class="btn-answer" onclick="readAnswer()">🔊 听答案</button>
+        <button class="btn-mic" id="mic-btn" onclick="kidRepeat()">🎤 跟读答案</button>
+    </div>
+</div>
+
+<div class="nav">
+    <button class="btn-prev" id="prev-btn" onclick="go(-1)">⬅ 上一题</button>
+    <button class="btn-next" id="next-btn" onclick="go(1)">下一题 ➡</button>
+</div>
+
+<div class="stats">⭐ <b id="stars">0</b> · 已完成 <b id="done-count">0</b> / 40 课</div>
+<div class="lesson-dots" id="dots"></div>
+<div class="tip">💡 建议用 Chrome 浏览器，点 🔊 朗读、🎤 跟读，每日 10 分钟更有效哦！</div>
+
+<script>
+// ================= 共享存储（与 learning_hub.html 一致） =================
+const Store = {
+    get(k, def) { try { const v = JSON.parse(localStorage.getItem(k)); return v === null ? def : v; } catch(e) { return def; } },
+    set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
+    addStar(n = 1) { const s = (Store.get('learn_stars', 0)) + n; Store.set('learn_stars', s); return s; },
+    addProgress(m, n = 1) { const p = Store.get('learn_progress', {chinese:0,pinyin:0,math:0,english:0}); p[m] = (p[m]||0) + n; Store.set('learn_progress', p); return p; },
+    addWrong(m, id) { const w = Store.get('learn_wrong', []); if (!w.find(x => x.module===m && x.id===id)) { w.push({module:m, id, addedAt:Date.now()}); Store.set('learn_wrong', w); } },
+    removeWrong(m, id) { const w = Store.get('learn_wrong', []).filter(x => !(x.module===m && x.id===id)); Store.set('learn_wrong', w); },
+    dailyCheckin() { const s = Store.get('learn_streak', {days:0, lastDate:null}); const t = new Date().toDateString(); if (s.lastDate===t) return s; const y = new Date(Date.now()-86400000).toDateString(); s.days = (s.lastDate===y) ? s.days+1 : 1; s.lastDate = t; Store.set('learn_streak', s); return s; },
+    awardBadge(id) { const b = Store.get('learn_badges', []); if (!b.includes(id)) { b.push(id); Store.set('learn_badges', b); } },
+};
+
+// ================= 语音工具 =================
+const Voice = {
+    speak(text, lang = 'zh-CN', rate = 0.9) {
+        if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器以获得语音功能'); return false; }
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang; u.rate = rate;
+        window.speechSynthesis.speak(u);
+        return true;
+    },
+    listen(lang = 'zh-CN', onResult, onEnd) {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { alert('请用 Chrome 浏览器以获得语音识别'); onResult(null); return false; }
+        const r = new SR();
+        r.lang = lang; r.continuous = false; r.interimResults = false;
+        r.onresult = e => onResult(e.results[0][0].transcript);
+        r.onerror = () => onResult(null);
+        r.onend = () => onEnd && onEnd();
+        r.start();
+        return true;
+    }
+};
+// 顺序朗读多段文字（避免互相打断）
+function speakChain(parts, rate = 0.9) {
+    if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器以获得语音功能'); return; }
+    window.speechSynthesis.cancel();
+    let i = 0;
+    function nxt() {
+        if (i >= parts.length) return;
+        const u = new SpeechSynthesisUtterance(parts[i]);
+        u.lang = 'zh-CN'; u.rate = rate;
+        u.onend = () => { i++; nxt(); };
+        u.onerror = () => { i++; nxt(); };
+        window.speechSynthesis.speak(u);
+    }
+    nxt();
+}
+// 中文数字归一化比较（孩子说"三"也能匹配"3"）
+const CN_NUM = {0:'零',1:'一',2:'二',3:'三',4:'四',5:'五',6:'六',7:'七',8:'八',9:'九',10:'十',11:'十一',12:'十二',13:'十三',14:'十四',15:'十五',16:'十六',17:'十七',18:'十八',19:'十九',20:'二十'};
+function answerMatches(transcript, ans) {
+    if (!transcript) return false;
+    const t = transcript.replace(/\s|，|。/g, '');
+    const a = String(ans).replace(/\s/g, '');
+    if (t.includes(a)) return true;
+    if (/^\d+$/.test(a)) {
+        if (CN_NUM[+a] && t.includes(CN_NUM[+a])) return true;
+        if (a === '2' && t.includes('两')) return true;
+    }
+    return false;
+}
+
+// ================= 题库（40 课 · 6 大类） =================
+// 结构: { id, type, stem, emoji, shape(bool 大字图形), answer(索引), options:[4], spoken(可选朗读文本) }
+const CAT = {
+    '数感': { icon: '🔢', name: '数感' },
+    '运算': { icon: '➕', name: '运算' },
+    '图形': { icon: '⭐', name: '图形' },
+    '分类': { icon: '📦', name: '分类' },
+    '规律': { icon: '🔁', name: '规律' },
+    '生活': { icon: '⏰', name: '生活' },
+};
+const CALC_IDS = ['op1','op2','op3','op4','op5','op6','op7','op8','op9','op10']; // 运算 10 课，全对解锁 math_calc
+
+const LESSONS = [
+    // ===== 数感 10 课 =====
+    { id:'ns1', type:'数感', stem:'数一数，下面有几个苹果？', emoji:'🍎🍎🍎🍎🍎', options:['3','4','5','6'], answer:2 },
+    { id:'ns2', type:'数感', stem:'数一数，下面有几颗星星？', emoji:'⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐', options:['13','14','15','16'], answer:2 },
+    { id:'ns3', type:'数感', stem:'数一数，图中有几只小鸭子？', emoji:'🦆🦆🦆🦆🦆🦆🦆', options:['6','7','8','9'], answer:2 },
+    { id:'ns4', type:'数感', stem:'5 的前面一个数是几？', emoji:'4  5  6', options:['3','4','6','7'], answer:1 },
+    { id:'ns5', type:'数感', stem:'比大小：5 和 8，中间填什么？', emoji:'5  ⬜  8', options:['大于 >','小于 <','等于 =','加号 +'], answer:1 },
+    { id:'ns6', type:'数感', stem:'从左数，第 3 个苹果是什么颜色？', emoji:'🍎 🍏 🍎 🍏 🍎 🍏', options:['红色','绿色','黄色','蓝色'], answer:0 },
+    { id:'ns7', type:'数感', stem:'倒数：10、9、8、7，接下来是几？', emoji:'10  9  8  7  ?', options:['11','6','5','0'], answer:1 },
+    { id:'ns8', type:'数感', stem:'下面哪个是双数？', emoji:'双数：2 4 6 8…', options:['3','5','6','9'], answer:2 },
+    { id:'ns9', type:'数感', stem:'比 6 多 1 的数是几？', emoji:'6  ➕  1  =  ?', options:['5','6','7','8'], answer:2 },
+    { id:'ns10', type:'数感', stem:'把 3、1、2 从小到大排，正确的是？', emoji:'3  1  2  ➡  ?', options:['1, 2, 3','3, 2, 1','2, 1, 3','1, 3, 2'], answer:0 },
+
+    // ===== 运算 10 课 =====
+    { id:'op1', type:'运算', stem:'5 以内加法：2 + 1 = ？', emoji:'🍎🍎  ➕  🍎  =  ?', options:['2','3','4','1'], answer:1 },
+    { id:'op2', type:'运算', stem:'5 以内减法：4 - 2 = ？', emoji:'🍎🍎🍎🍎  ➖  🍎🍎  =  ?', options:['1','2','3','4'], answer:1 },
+    { id:'op3', type:'运算', stem:'10 以内加法：6 + 3 = ？', emoji:'6  ➕  3  =  ?', options:['8','9','10','7'], answer:1 },
+    { id:'op4', type:'运算', stem:'10 以内减法：9 - 4 = ？', emoji:'9  ➖  4  =  ?', options:['4','5','6','3'], answer:1 },
+    { id:'op5', type:'运算', stem:'20 以内不进位加法：12 + 5 = ？', emoji:'12  ➕  5  =  ?', options:['15','16','17','18'], answer:2 },
+    { id:'op6', type:'运算', stem:'20 以内不退位减法：17 - 4 = ？', emoji:'17  ➖  4  =  ?', options:['12','13','14','15'], answer:1 },
+    { id:'op7', type:'运算', stem:'凑十法：8 加几等于 10？', emoji:'8  ➕  ⬜  =  10', options:['1','2','3','4'], answer:1 },
+    { id:'op8', type:'运算', stem:'连加：2 + 3 + 1 = ？', emoji:'2  ➕  3  ➕  1  =  ?', options:['5','6','7','4'], answer:1 },
+    { id:'op9', type:'运算', stem:'连减：5 - 2 - 1 = ？', emoji:'5  ➖  2  ➖  1  =  ?', options:['1','2','3','4'], answer:1 },
+    { id:'op10', type:'运算', stem:'应用题：你有 3 个苹果，妈妈又给你 2 个，一共几个？', emoji:'🍎🍎🍎  ➕  🍎🍎  =  ?', options:['4','5','6','3'], answer:1 },
+
+    // ===== 图形 6 课 =====
+    { id:'sh1', type:'图形', stem:'这个图形是什么形状？', emoji:'◯', shape:true, options:['圆形','正方形','三角形','长方形'], answer:0 },
+    { id:'sh2', type:'图形', stem:'这个图形是什么形状？', emoji:'▢', shape:true, options:['圆形','正方形','三角形','长方形'], answer:1 },
+    { id:'sh3', type:'图形', stem:'这个图形是什么形状？', emoji:'△', shape:true, options:['圆形','正方形','三角形','长方形'], answer:2 },
+    { id:'sh4', type:'图形', stem:'这个图形是什么形状？', emoji:'▭', shape:true, options:['圆形','正方形','三角形','长方形'], answer:3 },
+    { id:'sh5', type:'图形', stem:'下面哪个是三角形？(从左数)', emoji:'◯  ▢  △  ▭', shape:true, options:['第 1 个','第 2 个','第 3 个','第 4 个'], answer:2 },
+    { id:'sh6', type:'图形', stem:'数一数，图中有几个三角形？', emoji:'🔺🔵🔺🟦🔺🟦', options:['2 个','3 个','4 个','5 个'], answer:1 },
+
+    // ===== 分类 5 课 =====
+    { id:'cl1', type:'分类', stem:'按颜色分类，哪个和别的颜色不同？', emoji:'🔴  🔴  🔵  🔴', options:['第 1 个','第 2 个','第 3 个','第 4 个'], answer:2 },
+    { id:'cl2', type:'分类', stem:'按形状分类，哪个和别的形状不同？', emoji:'△  △  ◯  △', shape:true, options:['第 1 个','第 2 个','第 3 个','第 4 个'], answer:2 },
+    { id:'cl3', type:'分类', stem:'按大小分类，哪个和别的大小不同？', emoji:'🍓  🍓  🍉  🍓', options:['第 1 个','第 2 个','第 3 个','第 4 个'], answer:2 },
+    { id:'cl4', type:'分类', stem:'找不同：哪个和其他不一样？', emoji:'🍎  🍌  🍎  🍎', options:['第 1 个','第 2 个','第 3 个','第 4 个'], answer:1 },
+    { id:'cl5', type:'分类', stem:'和 🍎 同类的是哪一个？(找水果朋友)', emoji:'🍎  ➡  找朋友', options:['🍌 香蕉','🚗 小汽车','🐶 小狗','🎈 气球'], answer:0 },
+
+    // ===== 规律 5 课 =====
+    { id:'pt1', type:'规律', stem:'AB 重复：接下来该填什么？', emoji:'🍎 🍌 🍎 🍌 🍎 ?', options:['🍎 苹果','🍌 香蕉','🍇 葡萄','🚗 汽车'], answer:1 },
+    { id:'pt2', type:'规律', stem:'ABC 重复：接下来该填什么？', emoji:'🍎 🍌 🍇 🍎 🍌 🍇 🍎 ?', options:['🍎 苹果','🍌 香蕉','🍇 葡萄','🚗 汽车'], answer:1 },
+    { id:'pt3', type:'规律', stem:'AABB 重复：接下来该填什么？', emoji:'🍎🍎 🍌🍌 🍎🍎 🍌🍌 🍎?', options:['🍎 苹果','🍌 香蕉','🍇 葡萄','🚗 汽车'], answer:0 },
+    { id:'pt4', type:'规律', stem:'补全序列：2、4、6、?、10', emoji:'2  4  6  ⬜  10', options:['7','8','9','5'], answer:1 },
+    { id:'pt5', type:'规律', stem:'哪一组排列是有规律的？', emoji:'?', options:['1 3 2 4','1 2 3 4','3 1 4 2','2 4 1 3'], answer:1 },
+
+    // ===== 生活 4 课 =====
+    { id:'lf1', type:'生活', stem:'看钟表，这是几点？', emoji:'🕒', options:['2 点','3 点','4 点','12 点'], answer:1 },
+    { id:'lf2', type:'生活', stem:'看钟表，这是几点？', emoji:'🕡', options:['6 点','6 点半','7 点','12 点半'], answer:1 },
+    { id:'lf3', type:'生活', stem:'认识钱币：哪个钱最多？', emoji:'1 元 / 5 元 / 10 元 / 2 元', small:true, options:['1 元','5 元','10 元','2 元'], answer:2 },
+    { id:'lf4', type:'生活', stem:'购物：用 5 元买 2 元的雪糕，找回几元？', emoji:'💵5  ➖  🍦2  =  ?', options:['2 元','3 元','4 元','7 元'], answer:1 },
+];
+
+// ================= 状态 =================
+let curIdx = 0;
+const $ = id => document.getElementById(id);
+
+function getDone() { return Store.get('math_done', []); }
+function isDone(id) { return getDone().includes(id); }
+function isWrong(id) { return Store.get('learn_wrong', []).some(w => w.module === 'math' && w.id === id); }
+
+function startIdx() {
+    // 优先复习错题
+    const wrong = Store.get('learn_wrong', []).filter(w => w.module === 'math');
+    if (wrong.length) {
+        const i = LESSONS.findIndex(l => l.id === wrong[0].id);
+        if (i >= 0) return i;
+    }
+    const last = Store.get('math_last', 0);
+    return Math.min(Math.max(last, 0), LESSONS.length - 1);
+}
+
+function render() {
+    const q = LESSONS[curIdx];
+    const cat = CAT[q.type];
+    $('cur-no').textContent = curIdx + 1;
+    $('cur-cat').textContent = cat.name;
+    $('cat-tag').textContent = `${cat.icon} ${cat.name}`;
+    $('stem').textContent = q.stem;
+    const eb = $('emoji-box');
+    eb.className = 'emoji-box' + (q.shape ? ' shape' : (q.small ? ' small' : ''));
+    eb.textContent = q.emoji;
+
+    // 已完成标记
+    const done = isDone(q.id);
+    $('badge-done').style.display = done ? '' : 'none';
+
+    // 选项
+    $('options').innerHTML = q.options.map((o, i) =>
+        `<button class="opt" data-i="${i}" onclick="select(${i})"><span class="spk">🔊</span>${o}</button>`
+    ).join('');
+
+    // 反馈重置（若已完成则显示历史结果，否则清空）
+    const fb = $('feedback');
+    fb.className = 'feedback';
+    if (done) {
+        // 标记正确项
+        [...$('options').children].forEach((btn, i) => {
+            if (i === q.answer) btn.classList.add('correct', 'disabled');
+            else btn.classList.add('disabled');
+        });
+        fb.textContent = '✅ 本课已完成，可再练一次';
+        fb.className = 'feedback ok';
+        $('after-correct').style.display = '';
+    } else {
+        fb.textContent = '';
+        $('after-correct').style.display = 'none';
+    }
+
+    // 导航按钮
+    $('prev-btn').disabled = curIdx === 0;
+    $('next-btn').disabled = false;
+
+    // 统计
+    $('stars').textContent = Store.get('learn_stars', 0);
+    $('done-count').textContent = Math.min(getDone().length, 40);
+
+    renderDots();
+    Store.set('math_last', curIdx);
+}
+
+function renderDots() {
+    const done = getDone();
+    const wrong = Store.get('learn_wrong', []).filter(w => w.module === 'math').map(w => w.id);
+    $('dots').innerHTML = LESSONS.map((l, i) => {
+        let cls = 'dot';
+        if (i === curIdx) cls += ' cur';
+        else if (done.includes(l.id)) cls += ' done';
+        else if (wrong.includes(l.id)) cls += ' wrong';
+        return `<span class="${cls}" onclick="jump(${i})"></span>`;
+    }).join('');
+}
+
+function jump(i) { curIdx = i; render(); }
+
+function readStem() {
+    const q = LESSONS[curIdx];
+    Voice.speak(q.stem);
+}
+
+function select(i) {
+    const q = LESSONS[curIdx];
+    const done = isDone(q.id);
+    const optText = String(q.options[i]).replace(/🔊/g, '').trim();
+    if (done) {
+        // 已完成，仅朗读
+        Voice.speak(optText);
+        return;
+    }
+    const btns = $('options').children;
+    if (i === q.answer) {
+        btns[i].classList.add('correct');
+        [...btns].forEach(b => b.classList.add('disabled'));
+        const fb = $('feedback');
+        fb.textContent = '✅ 答对了！+1 ⭐';
+        fb.className = 'feedback ok';
+        // 记录
+        const doneArr = getDone();
+        const isNew = !doneArr.includes(q.id);
+        if (isNew) {
+            doneArr.push(q.id);
+            Store.set('math_done', doneArr);
+            Store.addProgress('math', 1);
+        }
+        Store.addStar(1);
+        Store.dailyCheckin();
+        Store.removeWrong('math', q.id);
+        // 运算全对勋章
+        if (q.type === '运算' && CALC_IDS.every(id => doneArr.includes(id) || id === q.id)) {
+            Store.awardBadge('math_calc');
+        }
+        $('after-correct').style.display = '';
+        $('stars').textContent = Store.get('learn_stars', 0);
+        $('done-count').textContent = Math.min(getDone().length, 40);
+        renderDots();
+        // 朗读：选项 + 鼓励
+        speakChain([optText, '答对了，真棒！']);
+    } else {
+        btns[i].classList.add('wrong');
+        const fb = $('feedback');
+        fb.textContent = '❌ 再试试';
+        fb.className = 'feedback no';
+        Store.addWrong('math', q.id);
+        renderDots();
+        speakChain([optText, '不对哦，再想想']);
+        setTimeout(() => { if (btns[i]) btns[i].classList.remove('wrong'); }, 800);
+    }
+}
+
+function readAnswer() {
+    const q = LESSONS[curIdx];
+    const ans = String(q.options[q.answer]).replace(/🔊/g, '').trim();
+    speakChain(['答案是', ans, ans, '你真棒！']);
+}
+
+function kidRepeat() {
+    const q = LESSONS[curIdx];
+    const ans = String(q.options[q.answer]).replace(/🔊/g, '').trim();
+    const mic = $('mic-btn');
+    mic.classList.add('rec');
+    mic.textContent = '🎤 聆听中…';
+    Voice.speak('请跟读：' + ans, 'zh-CN', 0.8);
+    setTimeout(() => {
+        Voice.listen('zh-CN', (t) => {
+            mic.classList.remove('rec');
+            mic.textContent = '🎤 跟读答案';
+            const fb = $('feedback');
+            if (t && answerMatches(t, ans)) {
+                fb.textContent = '👍 跟读正确，太厉害了！';
+                fb.className = 'feedback ok';
+                Voice.speak('读得真好，给你点赞！');
+            } else if (t) {
+                fb.textContent = '🎤 听到啦，再读一次试试～';
+                fb.className = 'feedback no';
+            } else {
+                fb.textContent = '🎤 没听清，请再读一次';
+                fb.className = 'feedback no';
+            }
+        }, () => {
+            mic.classList.remove('rec');
+            mic.textContent = '🎤 跟读答案';
+        });
+    }, 900);
+}
+
+function go(dir) {
+    const ni = curIdx + dir;
+    if (ni < 0 || ni >= LESSONS.length) return;
+    curIdx = ni;
+    render();
+}
+
+// 初始化
+curIdx = startIdx();
+render();
+</script>
+</body>
+</html>
