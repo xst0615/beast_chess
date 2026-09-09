@@ -98,7 +98,8 @@
         padding: 6px 4px; text-align: center;
     }
     .tone-cell.ok { background: #e8f5e9; border-color: var(--ok); }
-    .tone-cell .tm { font-size: 26px; font-weight: bold; color: #333; margin-bottom: 2px; }
+    .tone-cell .tm { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 2px; }
+    .tone-cell .ch { font-size: 18px; color: var(--main); margin-bottom: 4px; font-weight: bold; }
     .tone-cell .tb-acts { display: flex; gap: 4px; justify-content: center; }
     .mini-btn {
         min-width: 48px; min-height: 40px; border: none; border-radius: 8px;
@@ -149,8 +150,54 @@
     .nav-btn:hover { background: var(--main-light); }
     .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .nav-btn.home { flex: 0 0 80px; background: #eee; color: #666; border-color: #ddd; }
+    .nav-btn.pick { flex: 0 0 96px; background: #fff3e0; color: var(--main); border-color: #ffcc80; }
+    .nav-btn.pick:hover { background: #ffe0b2; }
+    /* 选拼音抽屉 */
+    .picker-mask {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 90;
+        display: none;
+    }
+    .picker-mask.open, .picker.open { display: block; }
+    .picker {
+        position: fixed; top: 0; right: -340px; width: 320px; max-width: 86vw;
+        height: 100%; background: #fff; z-index: 91;
+        box-shadow: -4px 0 16px rgba(0,0,0,0.18);
+        display: none; flex-direction: column;
+        transition: right 0.2s;
+    }
+    .picker.open { right: 0; display: flex; }
+    .picker-head {
+        padding: 14px 16px; background: var(--main); color: #fff;
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 17px;
+    }
+    .picker-close {
+        background: rgba(255,255,255,0.2); border: none; color: #fff;
+        width: 32px; height: 32px; border-radius: 16px; font-size: 18px; cursor: pointer;
+    }
+    .picker-list {
+        flex: 1; overflow-y: auto; padding: 10px;
+    }
+    .pick-item {
+        display: flex; align-items: center; gap: 10px; width: 100%;
+        padding: 10px 12px; border: 2px solid #f0f0f0; border-radius: 12px;
+        background: #fff; margin-bottom: 8px; cursor: pointer; font-family: inherit;
+        text-align: left; transition: all 0.12s;
+    }
+    .pick-item:hover { border-color: var(--main-light); background: #fce4ec; }
+    .pick-item.cur { border-color: var(--main); background: #fce4ec; }
+    .pick-item .pi-idx {
+        width: 26px; height: 26px; background: var(--main-light); color: var(--main-dark);
+        border-radius: 13px; font-size: 12px; font-weight: bold;
+        display: flex; align-items: center; justify-content: center; flex: 0 0 26px;
+    }
+    .pick-item.cur .pi-idx { background: var(--main); color: #fff; }
+    .pick-item .pi-ps { font-size: 18px; font-weight: bold; color: var(--main); flex: 1; }
+    .pick-item .pi-t { font-size: 11px; color: #999; }
+    .pick-item.done .pi-idx { background: var(--ok); color: #fff; }
     .tip { font-size: 12px; color: #aaa; text-align: center; margin-top: 10px; max-width: 640px; }
 </style>
+<script src="audio/manifest.js"></script>
 </head>
 <body>
 <a href="learning_hub.html" class="back-link">← 学习中心</a>
@@ -193,6 +240,17 @@
     <button class="nav-btn" id="btn-prev" onclick="prev()">⬅ 上一课</button>
     <button class="nav-btn home" onclick="location.href='learning_hub.html'">🏠</button>
     <button class="nav-btn" id="btn-next" onclick="next()">下一课 ➡</button>
+    <button class="nav-btn pick" onclick="togglePicker()">☰ 选拼音</button>
+</div>
+
+<!-- 选拼音抽屉 -->
+<div class="picker-mask" id="picker-mask" onclick="togglePicker()"></div>
+<div class="picker" id="picker">
+    <div class="picker-head">
+        <b>选拼音课</b>
+        <button class="picker-close" onclick="togglePicker()">✕</button>
+    </div>
+    <div class="picker-list" id="picker-list"></div>
 </div>
 
 <div class="tip">💡 用 Chrome 浏览器，允许麦克风权限。跟读成功得 ⭐，全部四声过关自动进入下一课。</div>
@@ -233,12 +291,51 @@ const Store = {
 
 // ================= 语音工具 =================
 const Voice = {
-    speak(text, lang = 'zh-CN', rate = 0.9) {
+    speak(text, lang = 'zh-CN', rate = 0.9, opts = {}) {
+        window.speechSynthesis && window.speechSynthesis.cancel();
+        if(window.AudioManifest && window.AudioManifest[text]){
+            try{
+                const a = new Audio('audio/' + window.AudioManifest[text]);
+                if(opts && opts.onEnd) a.addEventListener('ended', () => opts.onEnd());
+                a.addEventListener('error', () => this._tts(text, lang, rate, opts));
+                a.play().catch(() => this._tts(text, lang, rate, opts));
+                return true;
+            }catch(e){}
+        }
+        return this._tts(text, lang, rate, opts);
+    },
+    _tts(text, lang = 'zh-CN', rate = 0.9, opts = {}) {
         if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器'); return false; }
         window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = lang; u.rate = rate;
-        window.speechSynthesis.speak(u);
+        const voices = window.speechSynthesis.getVoices() || [];
+        const hints = lang.startsWith('zh') ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','zh-CN','zh_CN'] : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','en-US','en_US'];
+        const v = voices.find(x => hints.some(h => (x.name||'').includes(h) || x.lang === h));
+        const queue = [];
+        if(opts.intro) queue.push({ t: opts.intro, p: 1.32, r: 1.0, gap: 220 });
+        const parts = text.match(/[^。！？，；,.!?;]+[。！？，；,.!?;]?/g) || [text];
+        parts.forEach(seg => {
+            const s = seg.trim(); if(!s) return;
+            const last = s.slice(-1);
+            let p = 1.16, gap = 130;
+            if(/[？?]/.test(last)){ p = 1.42; gap = 250; }
+            else if(/[！!]/.test(last)){ p = 1.30; gap = 230; }
+            else if(/[。.]/.test(last)){ p = 1.06; gap = 280; }
+            else { p = 1.20; gap = 110; }
+            queue.push({ t: s, p, r: rate * 0.92, gap });
+        });
+        if(opts.praise) queue.push({ t: opts.praise, p: 1.38, r: 0.95, gap: 0 });
+        const play = (i) => {
+            if(i >= queue.length){ opts.onEnd && opts.onEnd(); return; }
+            const it = queue[i];
+            const u = new SpeechSynthesisUtterance(it.t);
+            u.lang = lang; u.rate = it.r; u.pitch = it.p;
+            if(v) u.voice = v;
+            u.onend = () => setTimeout(() => play(i+1), it.gap);
+            u.onerror = () => play(i+1);
+            opts.onSeg && opts.onSeg(it.t, i);
+            window.speechSynthesis.speak(u);
+        };
+        play(0);
         return true;
     },
     listen(lang = 'zh-CN', onResult, onEnd) {
@@ -259,6 +356,11 @@ const Voice = {
         return 0;
     }
 };
+// 预加载语音列表（Chrome 异步加载，触发后用户首次点击即有女声）
+if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 
 // 任意一个目标命中即算对
 function scoreAny(targets, heard) {
@@ -314,35 +416,96 @@ const WORDS = {
     eng:['鞥','鞥','鞥','鞥'], ing:['应','赢','影','硬'], ong:['轰','红','哄','哄'],
     yu:['淤','鱼','雨','遇'], ye:['耶','爷','野','夜'], yue:['约','月','月','月'],
     yuan:['冤','元','远','怨'], yin:['音','银','引','印'], yun:['晕','云','允','韵'],
-    ying:['应','赢','影','硬']
+    ying:['应','赢','影','硬'],
+    // 声母 + 韵母组合音节（四声练习扩充）
+    bo:['波','伯','跛','播'], po:['坡','婆','叵','破'], mo:['摸','魔','抹','末'],
+    fo:['佛','佛','佛','佛'], bi:['逼','鼻','比','壁'], pi:['批','皮','匹','屁'],
+    mi:['眯','迷','米','密'], di:['低','敌','底','地'], ti:['踢','提','体','替'],
+    ni:['妮','泥','你','腻'], li:['哩','离','里','力'], gu:['姑','骨','谷','故'],
+    ku:['哭','苦','库','裤'], hu:['呼','湖','虎','户'], ju:['居','菊','举','句'],
+    qu:['区','渠','取','去'], xu:['需','徐','许','绪'],
+    zha:['扎','炸','眨','炸'], zhe:['遮','折','者','这'], zhi:['只','直','只','志'],
+    zhu:['猪','竹','主','住'], zhao:['招','着','找','照'], zhou:['州','轴','走','皱'],
+    zhan:['占','展','斩','站'], zhen:['真','枕','诊','阵'], zhang:['张','长','涨','丈'],
+    zheng:['争','征','整','正'], zhong:['中','重','肿','众'],
+    cha:['插','茶','岔','差'], che:['车','扯','彻','撤'], chu:['出','除','楚','处'],
+    chao:['超','朝','炒','吵'], chou:['抽','愁','丑','臭'], chai:['拆','柴','虿','瘥'],
+    chan:['掺','缠','产','颤'], chen:['嗔','沉','碜','趁'], chang:['昌','常','厂','畅'],
+    cheng:['称','城','逞','秤'], chong:['充','虫','宠','铳'],
+    sha:['沙','啥','傻','煞'], she:['奢','蛇','舍','设'], shu:['书','熟','鼠','树'],
+    shao:['烧','勺','少','少'], shou:['收','熟','手','瘦'], shai:['筛','色','色','晒'],
+    shan:['山','闪','陕','扇'], shen:['申','神','审','慎'], shang:['伤','商','赏','上'],
+    sheng:['生','绳','省','胜'],
+    re:['惹','惹','惹','热'], ru:['如','茹','乳','入'], rao:['饶','饶','扰','绕'],
+    rou:['柔','揉','肉','肉'], ran:['然','然','染','燃'], ren:['人','忍','忍','认'],
+    rang:['嚷','瓤','壤','让'], rong:['荣','荣','冗','肉'],
+    za:['扎','砸','咋','乍'], ze:['则','责','怎','侧'], zu:['租','足','组','卒'],
+    zao:['糟','凿','早','造'], zou:['邹','走','奏','奏'], zan:['咱','攒','攒','赞'],
+    zen:['怎','怎','怎','怎'], zeng:['增','赠','赠','赠'], zong:['宗','纵','总','粽'],
+    ca:['擦','擦','擦','擦'], ce:['册','册','册','侧'], cu:['粗','促','醋','醋'],
+    cao:['操','曹','草','草'], cou:['凑','凑','凑','凑'], can:['参','残','惨','灿'],
+    cen:['岑','岑','岑','岑'], ceng:['层','层','蹭','蹭'], cong:['聪','从','从','从'],
+    sa:['撒','洒','撒','萨'], se:['色','色','色','色'], su:['苏','俗','诉','素'],
+    sao:['骚','扫','嫂','扫'], sou:['搜','叟','叟','嗽'], san:['三','散','伞','散'],
+    sen:['森','森','森','森'], seng:['僧','僧','僧','僧'], song:['松','耸','宋','送'],
+    ya:['压','牙','雅','亚'], yao:['妖','摇','咬','要'], you:['优','油','有','又'],
+    yan:['烟','言','眼','燕'], yin:['音','银','引','印'], yang:['央','羊','养','样'],
+    yong:['拥','永','勇','用'],
+    wa:['蛙','娃','瓦','袜'], wai:['歪','崴','外','外'], wei:['危','围','尾','为'],
+    wan:['弯','完','晚','万'], wang:['汪','王','往','忘'], weng:['翁','翁','瓮','瓮'],
+    nü:['女','女','女','女'], lü:['驴','吕','屡','律'],
+    niao:['鸟','鸟','鸟','鸟'], lia:['俩','俩','俩','俩'], lie:['咧','列','裂','烈'],
+    liao:['撩','辽','了','料'], liu:['溜','留','柳','六'], liang:['凉','梁','两','亮'],
+    niu:['妞','牛','纽','拗'], nie:['捏','涅','聂','孽'], nang:['囊','囊','曩','囊'],
+    neng:['能','能','能','能'], ning:['宁','凝','拧','泞'],
+    jia:['家','夹','假','价'], jie:['结','截','姐','界'], jiao:['交','嚼','角','叫'],
+    jiu:['纠','揪','九','就'], jian:['尖','肩','检','见'], jin:['巾','仅','紧','进'],
+    jiang:['江','墙','讲','降'], jiong:['炯','炯','炯','迥'],
+    qia:['掐','卡','卡','恰'], qie:['切','茄','且','切'], qiao:['敲','桥','巧','俏'],
+    qiu:['秋','求','九','就'], qian:['千','钱','浅','欠'], qin:['亲','琴','勤','沁'],
+    qiang:['枪','强','抢','呛'], qiong:['穷','穷','穷','穷'],
+    xia:['虾','霞','夏','下'], xie:['些','鞋','写','谢'], xiao:['消','小','晓','笑'],
+    xiu:['休','求','朽','秀'], xian:['先','闲','显','线'], xin:['心','寻','信','信'],
+    xiang:['香','降','想','向'], xiong:['兄','雄','熊','凶'],
+    // 补充：声母 + 韵母组合音节（四声练习用）
+    bu:['补','不','步','布'], de:['得','得','得','的'], dou:['都','兜','斗','豆'],
+    du:['都','读','赌','度'], fei:['飞','肥','匪','废'], fu:['夫','扶','府','父'],
+    ga:['噶','噶','噶','尬'], guo:['郭','国','果','过'], ha:['哈','蛤','哈','哈'],
+    hou:['猴','侯','吼','后'], hua:['花','华','画','话'], ka:['咖','卡','卡','喀'],
+    kou:['抠','口','口','扣'], le:['勒','勒','了','乐'], lou:['搂','楼','篓','漏'],
+    lu:['噜','炉','鲁','路'], mu:['摸','模','母','木'], ne:['讷','讷','讷','讷'],
+    nou:['耨','耨','耨','耨'], nu:['奴','努','努','怒'], pu:['扑','葡','普','铺'],
+    te:['特','特','特','特'], tou:['偷','头','投','透'], tu:['凸','图','土','兔'],
+    wo:['窝','窝','我','卧']
 };
 
 // ================= 35 课内容 =================
 // ps: 本课拼音；ex: 例字；bl: 拼读组合；t: 类型；m: 口型描述
+// ts: 本课四声练习音节（可选，缺省从 ps 推导）
 const LESSONS = [
-    { t:'声母', m:'双唇闭合，气流突然冲开双唇', ps:['b'], ex:[{c:'爸',w:'爸爸'},{c:'波',w:'波纹'}], bl:[{i:'b',f:'a',r:'ba'},{i:'b',f:'o',r:'bo'}] },
-    { t:'声母', m:'双唇闭合，气流冲开双唇，强烈送气', ps:['p'], ex:[{c:'坡',w:'上坡'},{c:'怕',w:'害怕'}], bl:[{i:'p',f:'a',r:'pa'},{i:'p',f:'o',r:'po'}] },
-    { t:'声母', m:'双唇闭合，气流从鼻腔流出', ps:['m'], ex:[{c:'妈',w:'妈妈'},{c:'马',w:'小马'}], bl:[{i:'m',f:'a',r:'ma'},{i:'m',f:'o',r:'mo'}] },
-    { t:'声母', m:'上齿轻咬下唇，气流摩擦而出', ps:['f'], ex:[{c:'发',w:'发现'},{c:'飞',w:'飞机'}], bl:[{i:'f',f:'a',r:'fa'},{i:'f',f:'u',r:'fu'}] },
-    { t:'声母', m:'舌尖抵住上牙龈，气流突然放开', ps:['d'], ex:[{c:'大',w:'大小'},{c:'刀',w:'小刀'}], bl:[{i:'d',f:'a',r:'da'},{i:'d',f:'e',r:'de'}] },
-    { t:'声母', m:'舌尖抵住上牙龈，气流放开并送气', ps:['t'], ex:[{c:'他',w:'他们'},{c:'兔',w:'兔子'}], bl:[{i:'t',f:'a',r:'ta'},{i:'t',f:'e',r:'te'}] },
-    { t:'声母', m:'舌尖抵住上牙龈，气流从鼻腔流出', ps:['n'], ex:[{c:'鸟',w:'小鸟'},{c:'牛',w:'黄牛'}], bl:[{i:'n',f:'a',r:'na'},{i:'n',f:'i',r:'ni'}] },
-    { t:'声母', m:'舌尖抵住上牙龈，气流从舌头两侧流出', ps:['l'], ex:[{c:'老',w:'老人'},{c:'里',w:'里面'}], bl:[{i:'l',f:'a',r:'la'},{i:'l',f:'e',r:'le'}] },
-    { t:'声母', m:'舌根抵住软腭，气流突然放开', ps:['g'], ex:[{c:'哥',w:'哥哥'},{c:'狗',w:'小狗'}], bl:[{i:'g',f:'e',r:'ge'},{i:'g',f:'u',r:'gu'}] },
-    { t:'声母', m:'舌根抵住软腭，气流放开并送气', ps:['k'], ex:[{c:'口',w:'开口'},{c:'看',w:'看见'}], bl:[{i:'k',f:'e',r:'ke'},{i:'k',f:'u',r:'ku'}] },
-    { t:'声母', m:'舌根抵住软腭，气流摩擦而出', ps:['h'], ex:[{c:'花',w:'花朵'},{c:'河',w:'小河'}], bl:[{i:'h',f:'e',r:'he'},{i:'h',f:'u',r:'hu'}] },
-    { t:'声母', m:'舌面抵住硬腭，气流摩擦而出', ps:['j'], ex:[{c:'鸡',w:'小鸡'},{c:'家',w:'家庭'}], bl:[{i:'j',f:'i',r:'ji'}] },
-    { t:'声母', m:'舌面抵住硬腭，气流摩擦并送气', ps:['q'], ex:[{c:'七',w:'七个'},{c:'球',w:'皮球'}], bl:[{i:'q',f:'i',r:'qi'}] },
-    { t:'声母', m:'舌面接近硬腭，气流摩擦而出', ps:['x'], ex:[{c:'西',w:'西方'},{c:'小',w:'大小'}], bl:[{i:'x',f:'i',r:'xi'}] },
-    { t:'声母', m:'舌尖翘起抵住硬腭前部，气流突然放开', ps:['zh'], ex:[{c:'竹',w:'竹子'},{c:'中',w:'中间'}], bl:[{i:'zh',f:'a',r:'zha'}] },
-    { t:'声母', m:'舌尖翘起抵住硬腭前部，气流送气', ps:['ch'], ex:[{c:'车',w:'汽车'},{c:'吃',w:'吃饭'}], bl:[{i:'ch',f:'a',r:'cha'}] },
-    { t:'声母', m:'舌尖翘起靠近硬腭，气流摩擦而出', ps:['sh'], ex:[{c:'书',w:'看书'},{c:'水',w:'喝水'}], bl:[{i:'sh',f:'a',r:'sha'}] },
-    { t:'声母', m:'舌尖翘起靠近硬腭，声带振动', ps:['r'], ex:[{c:'人',w:'人民'},{c:'日',w:'日月'}], bl:[{i:'r',f:'e',r:'re'}] },
-    { t:'声母', m:'舌尖平伸抵住上齿背，气流突然放开', ps:['z'], ex:[{c:'字',w:'写字'},{c:'早',w:'早上'}], bl:[{i:'z',f:'a',r:'za'}] },
-    { t:'声母', m:'舌尖平伸抵住上齿背，气流送气', ps:['c'], ex:[{c:'草',w:'小草'},{c:'才',w:'刚才'}], bl:[{i:'c',f:'a',r:'ca'}] },
-    { t:'声母', m:'舌尖平伸靠近上齿背，气流摩擦而出', ps:['s'], ex:[{c:'三',w:'三个'},{c:'四',w:'四个'}], bl:[{i:'s',f:'a',r:'sa'}] },
-    { t:'声母', m:'嘴角向两边展开，像微笑', ps:['y'], ex:[{c:'衣',w:'衣服'},{c:'雨',w:'下雨'}], bl:[{i:'y',f:'u',r:'yu'}] },
-    { t:'声母', m:'双唇收圆，像吹口哨', ps:['w'], ex:[{c:'五',w:'五个'},{c:'王',w:'国王'}], bl:[{i:'w',f:'u',r:'wu'}] },
+    { t:'声母', m:'双唇闭合，气流突然冲开双唇', ps:['b'], ts:['ba','bo','bi','bu'], ex:[{c:'爸',w:'爸爸'},{c:'波',w:'波纹'}], bl:[{i:'b',f:'a',r:'ba'},{i:'b',f:'o',r:'bo'}] },
+    { t:'声母', m:'双唇闭合，气流冲开双唇，强烈送气', ps:['p'], ts:['pa','po','pi','pu'], ex:[{c:'坡',w:'上坡'},{c:'怕',w:'害怕'}], bl:[{i:'p',f:'a',r:'pa'},{i:'p',f:'o',r:'po'}] },
+    { t:'声母', m:'双唇闭合，气流从鼻腔流出', ps:['m'], ts:['ma','mo','mi','mu'], ex:[{c:'妈',w:'妈妈'},{c:'马',w:'小马'}], bl:[{i:'m',f:'a',r:'ma'},{i:'m',f:'o',r:'mo'}] },
+    { t:'声母', m:'上齿轻咬下唇，气流摩擦而出', ps:['f'], ts:['fa','fo','fu','fei'], ex:[{c:'发',w:'发现'},{c:'飞',w:'飞机'}], bl:[{i:'f',f:'a',r:'fa'},{i:'f',f:'u',r:'fu'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流突然放开', ps:['d'], ts:['da','de','di','du','dou'], ex:[{c:'大',w:'大小'},{c:'刀',w:'小刀'}], bl:[{i:'d',f:'a',r:'da'},{i:'d',f:'e',r:'de'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流放开并送气', ps:['t'], ts:['ta','te','ti','tu','tou'], ex:[{c:'他',w:'他们'},{c:'兔',w:'兔子'}], bl:[{i:'t',f:'a',r:'ta'},{i:'t',f:'e',r:'te'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流从鼻腔流出', ps:['n'], ts:['na','ni','nu','ne','nou'], ex:[{c:'鸟',w:'小鸟'},{c:'牛',w:'黄牛'}], bl:[{i:'n',f:'a',r:'na'},{i:'n',f:'i',r:'ni'}] },
+    { t:'声母', m:'舌尖抵住上牙龈，气流从舌头两侧流出', ps:['l'], ts:['la','le','li','lu','lou'], ex:[{c:'老',w:'老人'},{c:'里',w:'里面'}], bl:[{i:'l',f:'a',r:'la'},{i:'l',f:'e',r:'le'}] },
+    { t:'声母', m:'舌根抵住软腭，气流突然放开', ps:['g'], ts:['ge','gu','ga','kou','guo'], ex:[{c:'哥',w:'哥哥'},{c:'狗',w:'小狗'}], bl:[{i:'g',f:'e',r:'ge'},{i:'g',f:'u',r:'gu'}] },
+    { t:'声母', m:'舌根抵住软腭，气流放开并送气', ps:['k'], ts:['ke','ku','ka','kou'], ex:[{c:'口',w:'开口'},{c:'看',w:'看见'}], bl:[{i:'k',f:'e',r:'ke'},{i:'k',f:'u',r:'ku'}] },
+    { t:'声母', m:'舌根抵住软腭，气流摩擦而出', ps:['h'], ts:['he','hu','ha','hou','hua'], ex:[{c:'花',w:'花朵'},{c:'河',w:'小河'}], bl:[{i:'h',f:'e',r:'he'},{i:'h',f:'u',r:'hu'}] },
+    { t:'声母', m:'舌面抵住硬腭，气流摩擦而出', ps:['j'], ts:['ji','jia','jie','jiu','jian'], ex:[{c:'鸡',w:'小鸡'},{c:'家',w:'家庭'}], bl:[{i:'j',f:'i',r:'ji'}] },
+    { t:'声母', m:'舌面抵住硬腭，气流摩擦并送气', ps:['q'], ts:['qi','qia','qie','qiu','qian'], ex:[{c:'七',w:'七个'},{c:'球',w:'皮球'}], bl:[{i:'q',f:'i',r:'qi'}] },
+    { t:'声母', m:'舌面接近硬腭，气流摩擦而出', ps:['x'], ts:['xi','xia','xie','xiu','xian'], ex:[{c:'西',w:'西方'},{c:'小',w:'大小'}], bl:[{i:'x',f:'i',r:'xi'}] },
+    { t:'声母', m:'舌尖翘起抵住硬腭前部，气流突然放开', ps:['zh'], ts:['zhi','zha','zhe','zhu','zhou','zhao'], ex:[{c:'竹',w:'竹子'},{c:'中',w:'中间'}], bl:[{i:'zh',f:'a',r:'zha'}] },
+    { t:'声母', m:'舌尖翘起抵住硬腭前部，气流送气', ps:['ch'], ts:['chi','cha','che','chu','chou','chao'], ex:[{c:'车',w:'汽车'},{c:'吃',w:'吃饭'}], bl:[{i:'ch',f:'a',r:'cha'}] },
+    { t:'声母', m:'舌尖翘起靠近硬腭，气流摩擦而出', ps:['sh'], ts:['shi','sha','she','shu','shou','shao'], ex:[{c:'书',w:'看书'},{c:'水',w:'喝水'}], bl:[{i:'sh',f:'a',r:'sha'}] },
+    { t:'声母', m:'舌尖翘起靠近硬腭，声带振动', ps:['r'], ts:['ri','re','ru','rou','rao'], ex:[{c:'人',w:'人民'},{c:'日',w:'日月'}], bl:[{i:'r',f:'e',r:'re'}] },
+    { t:'声母', m:'舌尖平伸抵住上齿背，气流突然放开', ps:['z'], ts:['zi','za','ze','zu','zou','zao'], ex:[{c:'字',w:'写字'},{c:'早',w:'早上'}], bl:[{i:'z',f:'a',r:'za'}] },
+    { t:'声母', m:'舌尖平伸抵住上齿背，气流送气', ps:['c'], ts:['ci','ca','ce','cu','cou','cao'], ex:[{c:'草',w:'小草'},{c:'才',w:'刚才'}], bl:[{i:'c',f:'a',r:'ca'}] },
+    { t:'声母', m:'舌尖平伸靠近上齿背，气流摩擦而出', ps:['s'], ts:['si','sa','se','su','sou','sao'], ex:[{c:'三',w:'三个'},{c:'四',w:'四个'}], bl:[{i:'s',f:'a',r:'sa'}] },
+    { t:'声母', m:'嘴角向两边展开，像微笑', ps:['y'], ts:['yi','ya','ye','you','yan','yue','yuan'], ex:[{c:'衣',w:'衣服'},{c:'雨',w:'下雨'}], bl:[{i:'y',f:'u',r:'yu'}] },
+    { t:'声母', m:'双唇收圆，像吹口哨', ps:['w'], ts:['wu','wa','wo','wei','wan','wang'], ex:[{c:'五',w:'五个'},{c:'王',w:'国王'}], bl:[{i:'w',f:'u',r:'wu'}] },
     { t:'韵母', m:'单韵母：a 口大开、o 圆口、e 展口', ps:['a','o','e'], ex:[{c:'阿',w:'阿姨'},{c:'鹅',w:'白鹅'}] },
     { t:'韵母', m:'单韵母：i 展口、u 圆口、ü 圆口前', ps:['i','u','ü'], ex:[{c:'衣',w:'衣服'},{c:'鱼',w:'小鱼'}] },
     { t:'韵母', m:'复韵母：先 a 后 i、先 e 后 i、先 u 后 i', ps:['ai','ei','ui'], ex:[{c:'爱',w:'爱心'},{c:'对',w:'对不起'}] },
@@ -422,17 +585,19 @@ function render() {
         </button>
     `).join('');
 
-    // 四声
+    // 四声（优先用 ts，缺省用 ps）
+    const toneList = L.ts || L.ps;
     let toneHtml = '';
-    L.ps.forEach((p, i) => {
+    toneList.forEach((p, i) => {
         const marks = marksOf(p);
         const words = wordsOf(p);
         toneHtml += `<div class="tone-block">
-            <div class="tb-head">拼音 <b>${p}</b> 的四声 <span class="done-dot" id="dot-${i}"></span></div>
+            <div class="tb-head"><b>${p}</b> 的四声 <span class="done-dot" id="dot-${i}"></span></div>
             <div class="tone-grid">`;
         for (let t = 0; t < 4; t++) {
             toneHtml += `<div class="tone-cell" id="cell-${i}-${t}">
                 <div class="tm">${marks[t]}</div>
+                <div class="ch">${words[t]}</div>
                 <div class="tb-acts">
                     <button class="mini-btn" onclick="hearTone(${i},${t})">🔊</button>
                     <button class="mini-btn mic" id="mic-${i}-${t}" onclick="readTone(${i},${t})">🎤</button>
@@ -629,6 +794,33 @@ function prev() {
 function next() {
     if (state.idx < LESSONS.length - 1) { state.idx++; render(); }
     else { setFeedback('ok', '🎓 全部 35 课学完，你已是拼音小达人！'); }
+}
+// 选拼音抽屉
+function togglePicker() {
+    const m = $('picker-mask'), p = $('picker');
+    const open = !p.classList.contains('open');
+    if (open) { renderPicker(); }
+    m.classList.toggle('open', open);
+    p.classList.toggle('open', open);
+}
+function renderPicker() {
+    loadLearned();
+    $('picker-list').innerHTML = LESSONS.map((L, i) => {
+        const gid = 'L' + i;
+        const isDone = state.learned.has(gid);
+        const isCur = i === state.idx;
+        const ps = L.ps.join(' ');
+        return `<button class="pick-item ${isCur ? 'cur' : ''} ${isDone ? 'done' : ''}" onclick="jumpTo(${i})">
+            <span class="pi-idx">${i + 1}</span>
+            <span class="pi-ps">${ps}</span>
+            <span class="pi-t">${L.t}</span>
+        </button>`;
+    }).join('');
+}
+function jumpTo(i) {
+    state.idx = i;
+    togglePicker();
+    render();
 }
 
 // 从错题优先进入（如有拼音错题则跳到相关课）

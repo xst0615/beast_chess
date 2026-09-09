@@ -48,6 +48,19 @@
     .stroke-box { display:flex; flex-direction:column; align-items:center; gap:4px; }
     .stroke-box svg { width:170px; height:170px; background:#fff8e1; border:2px dashed #ffcc80; border-radius:12px; }
     .stroke-tip { font-size:11px; color:#999; }
+    /* 田字格练字区 */
+    .write-area { width:100%; display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:4px; }
+    .write-wrap { position:relative; width:220px; height:220px; }
+    .write-bg, .write-canvas { position:absolute; top:0; left:0; width:220px; height:220px; border-radius:12px; }
+    .write-bg { background:#fffef8; border:2px solid #ffcc80; }
+    .write-canvas { cursor:crosshair; touch-action:none; }
+    .write-step { font-size:13px; color:var(--main); font-weight:bold; min-height:18px; }
+    .write-ops { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+    .wbtn { background:#fff3e0; color:var(--main); border:2px solid #ffcc80; padding:6px 14px; border-radius:18px; font-size:13px; font-weight:bold; cursor:pointer; font-family:inherit; min-height:34px; transition:all 0.15s; }
+    .wbtn:hover { background:#ffe0b2; }
+    .wbtn:active { transform:translateY(1px); }
+    .wbtn.hidden { display:none; }
+    @media (max-width:480px){ .write-wrap{ width:200px; height:200px; } }
 
     .order { font-size:13px; color:#666; background:#fafafa; border-radius:10px; padding:6px 12px; }
     .order b { color:var(--main); }
@@ -107,6 +120,8 @@
     .ll-cell .ln { display:block; font-size:10px; color:#999; }
     .tip { font-size:12px; color:#888; text-align:center; margin-top:14px; max-width:560px; }
 </style>
+<script src="audio/manifest.js"></script>
+<script src="chinese_strokes.js"></script>
 </head>
 <body>
 
@@ -170,12 +185,53 @@ function toggleFav(id){
 
 /* ================= 语音工具 ================= */
 const Voice = {
-    speak(text, lang = 'zh-CN', rate = 0.9){
+    speak(text, lang = 'zh-CN', rate = 0.9, opts = {}){
+        window.speechSynthesis && window.speechSynthesis.cancel();
+        // 优先播放预生成音频（微软晓晓神经网络女声，音质远优于系统 TTS）
+        if(window.AudioManifest && window.AudioManifest[text]){
+            try{
+                const a = new Audio('audio/' + window.AudioManifest[text]);
+                if(opts && opts.onEnd) a.addEventListener('ended', () => opts.onEnd());
+                a.addEventListener('error', () => this._tts(text, lang, rate, opts));
+                a.play().catch(() => this._tts(text, lang, rate, opts));
+                return true;
+            }catch(e){}
+        }
+        return this._tts(text, lang, rate, opts);
+    },
+    _tts(text, lang = 'zh-CN', rate = 0.9, opts = {}){
         if(!('speechSynthesis' in window)){ alert('您的浏览器不支持语音朗读，请用 Chrome'); return false; }
         window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = lang; u.rate = rate;
-        window.speechSynthesis.speak(u);
+        // 选女声，更柔和生动（婷婷为 macOS 中文女声，优先匹配）
+        const voices = window.speechSynthesis.getVoices() || [];
+        const hints = lang.startsWith('zh') ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','zh-CN','zh_CN'] : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','en-US','en_US'];
+        const v = voices.find(x => hints.some(h => (x.name||'').includes(h) || x.lang === h));
+        const queue = [];
+        if(opts.intro) queue.push({ t: opts.intro, p: 1.32, r: 1.0, gap: 220 });
+        const parts = text.match(/[^。！？，；,.!?;]+[。！？，；,.!?;]?/g) || [text];
+        parts.forEach(seg => {
+            const s = seg.trim(); if(!s) return;
+            const last = s.slice(-1);
+            let p = 1.16, gap = 130;
+            if(/[？?]/.test(last)){ p = 1.42; gap = 250; }
+            else if(/[！!]/.test(last)){ p = 1.30; gap = 230; }
+            else if(/[。.]/.test(last)){ p = 1.06; gap = 280; }
+            else { p = 1.20; gap = 110; }
+            queue.push({ t: s, p, r: rate * 0.92, gap });
+        });
+        if(opts.praise) queue.push({ t: opts.praise, p: 1.38, r: 0.95, gap: 0 });
+        const play = (i) => {
+            if(i >= queue.length){ opts.onEnd && opts.onEnd(); return; }
+            const it = queue[i];
+            const u = new SpeechSynthesisUtterance(it.t);
+            u.lang = lang; u.rate = it.r; u.pitch = it.p;
+            if(v) u.voice = v;
+            u.onend = () => setTimeout(() => play(i+1), it.gap);
+            u.onerror = () => play(i+1);
+            opts.onSeg && opts.onSeg(it.t, i);
+            window.speechSynthesis.speak(u);
+        };
+        play(0);
         return true;
     },
     listen(lang = 'zh-CN', onResult, onEnd){
@@ -197,6 +253,11 @@ const Voice = {
         return common / Math.max(1, t.length) > 0.5 ? 1 : 0;
     }
 };
+// 预加载语音列表（Chrome 异步加载，触发后用户首次点击即有女声）
+if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 
 /* ================= 字库 40 课 100 字 ================= */
 /* 每个字：c 字, p 拼音, w[组词2], s 例句, o 笔顺文字 */
@@ -233,111 +294,111 @@ const LESSONS = [
   {c:'手',p:'shǒu',w:['双手','洗手'],s:'饭前要洗手。',o:'撇、横、横、竖钩'},
   {c:'目',p:'mù',w:['目光','耳目'],s:'眼睛是目。',o:'竖、横折、横、横、横'},
  ],[ // L11
-  {c:'耳',p:'ěr',w:['耳朵','耳机'],s:'耳朵能听声音。',o:'横、竖、竖、横、横、横、竖'},
+  {c:'耳',p:'ěr',w:['耳朵','耳机'],s:'耳朵能听声音。',o:'横、竖、竖、横、横、横'},
   {c:'头',p:'tóu',w:['头发','木头'],s:'头上有头发。',o:'点、点、横、撇、点'},
-  {c:'足',p:'zú',w:['双足','足球'],s:'我踢足球。',o:'竖、横折、横、撇、捺'},
+  {c:'足',p:'zú',w:['双足','足球'],s:'我踢足球。',o:'竖、横折、横、竖、横、撇、捺'},
  ],[ // L12
-  {c:'立',p:'lì',w:['起立','站立'],s:'老师好,请起立。',o:'点、横、撇、横、横、横、竖'},
-  {c:'坐',p:'zuò',w:['坐下','请坐'],s:'请坐下。',o:'撇、点、撇、捺、横、竖、横'},
-  {c:'行',p:'xíng',w:['行走','排队行'],s:'我们排队行进。',o:'撇、撇、竖、横、横、竖'},
+  {c:'立',p:'lì',w:['起立','站立'],s:'老师好,请起立。',o:'点、横、点、撇、横'},
+  {c:'坐',p:'zuò',w:['坐下','请坐'],s:'请坐下。',o:'撇、点、撇、点、横、竖、横'},
+  {c:'行',p:'xíng',w:['行走','排队行'],s:'我们排队行进。',o:'撇、撇、竖、横、横、竖钩'},
  ],[ // L13
   {c:'大',p:'dà',w:['大人','大小'],s:'大人有大手。',o:'横、撇、捺'},
   {c:'小',p:'xiǎo',w:['小孩','大小'],s:'小孩在玩。',o:'竖钩、撇、点'},
-  {c:'多',p:'duō',w:['多少','很多'],s:'很多花开了。',o:'撇、竖、横折、横、撇、横撇、点'},
+  {c:'多',p:'duō',w:['多少','很多'],s:'很多花开了。',o:'撇、横撇、点、撇、横撇、点'},
  ],[ // L14
   {c:'少',p:'shǎo',w:['多少','很少'],s:'很少有人来。',o:'竖、撇、点、撇'},
-  {c:'前',p:'qián',w:['前后','前面'],s:'前面有车。',o:'点、撇、横、竖、横折、横、竖'},
-  {c:'后',p:'hòu',w:['前后','后面'],s:'后面有人。',o:'撇、撇、横、竖、横折、横、竖'},
+  {c:'前',p:'qián',w:['前后','前面'],s:'前面有车。',o:'点、撇、横、竖、横折钩、横、横、竖、竖钩'},
+  {c:'后',p:'hòu',w:['前后','后面'],s:'后面有人。',o:'撇、撇、横、竖、横折、横'},
  ],[ // L15
-  {c:'东',p:'dōng',w:['东西','东方'],s:'太阳从东方升起。',o:'横、撇、竖钩、撇、点'},
-  {c:'西',p:'xī',w:['东西','西方'],s:'太阳落向西方。',o:'横、竖、横折、撇、竖弯、横'},
-  {c:'南',p:'nán',w:['南北','南方'],s:'南方天气热。',o:'横、竖、横折、横、竖、竖、横'},
+  {c:'东',p:'dōng',w:['东西','东方'],s:'太阳从东方升起。',o:'横、撇折、竖钩、撇、点'},
+  {c:'西',p:'xī',w:['东西','西方'],s:'太阳落向西方。',o:'横、竖、横折、撇、竖折、横'},
+  {c:'南',p:'nán',w:['南北','南方'],s:'南方天气热。',o:'横、竖、竖、横折钩、点、撇、横、横、竖'},
  ],[ // L16
-  {c:'北',p:'běi',w:['南北','北方'],s:'北方天气冷。',o:'竖、横、横、提、撇、竖弯钩'},
+  {c:'北',p:'běi',w:['南北','北方'],s:'北方天气冷。',o:'竖、横、提、撇、竖弯钩'},
   {c:'木',p:'mù',w:['木头','树木'],s:'树木真多。',o:'横、竖、撇、捺'},
-  {c:'林',p:'lín',w:['树林','森林'],s:'树林里有鸟。',o:'横、竖、撇、点、横、竖、撇、点'},
+  {c:'林',p:'lín',w:['树林','森林'],s:'树林里有鸟。',o:'横、竖、撇、点、横、竖、撇、捺'},
  ],[ // L17
   {c:'禾',p:'hé',w:['禾苗','禾田'],s:'田里有禾苗。',o:'撇、横、竖、撇、捺'},
   {c:'米',p:'mǐ',w:['大米','玉米'],s:'我吃大米饭。',o:'点、撇、横、竖、撇、捺'},
-  {c:'虫',p:'chóng',w:['虫子','小虫'],s:'虫子在爬。',o:'竖、横折、横、横、竖、提、撇、点'},
+  {c:'虫',p:'chóng',w:['虫子','小虫'],s:'虫子在爬。',o:'竖、横折、横、竖、提、点'},
  ],[ // L18
   {c:'鱼',p:'yú',w:['小鱼','鱼儿'],s:'小鱼在游。',o:'撇、横撇、竖、横折、横、竖、横、横'},
-  {c:'鸟',p:'niǎo',w:['小鸟','飞鸟'],s:'小鸟会飞。',o:'撇、竖、横折、横、竖、横折、横'},
-  {c:'马',p:'mǎ',w:['小马','上马'],s:'马儿跑得快。',o:'横、竖、横折、横、竖折折钩、横'},
+  {c:'鸟',p:'niǎo',w:['小鸟','飞鸟'],s:'小鸟会飞。',o:'撇、横折钩、点、竖折折钩、横'},
+  {c:'马',p:'mǎ',w:['小马','上马'],s:'马儿跑得快。',o:'横折、竖折折钩、横'},
  ],[ // L19
   {c:'牛',p:'niú',w:['小牛','水牛'],s:'牛在吃草。',o:'撇、横、横、竖'},
-  {c:'羊',p:'yáng',w:['小羊','山羊'],s:'羊吃青草。',o:'点、撇、横、横、撇、横、横、竖'},
-  {c:'草',p:'cǎo',w:['青草','草地'],s:'地上有青草。',o:'横、竖、竖、竖、横折、横、横、竖、横'},
+  {c:'羊',p:'yáng',w:['小羊','山羊'],s:'羊吃青草。',o:'点、撇、横、横、横、竖'},
+  {c:'草',p:'cǎo',w:['青草','草地'],s:'地上有青草。',o:'横、竖、竖、竖、横折、横、横、横、竖'},
  ],[ // L20
   {c:'花',p:'huā',w:['花朵','开花'],s:'花开了。',o:'横、竖、竖、撇、竖、撇、竖弯钩'},
-  {c:'雨',p:'yǔ',w:['下雨','雨水'],s:'下雨了。',o:'横、竖、竖、横折钩、竖、点、点、点、点'},
-  {c:'风',p:'fēng',w:['大风','刮风'],s:'大风刮来。',o:'撇、横、竖、竖、横、撇、横、竖弯钩'},
+  {c:'雨',p:'yǔ',w:['下雨','雨水'],s:'下雨了。',o:'横、竖、横折钩、竖、点、点、点、点'},
+  {c:'风',p:'fēng',w:['大风','刮风'],s:'大风刮来。',o:'撇、横折弯钩、撇、点'},
  ],[ // L21
   {c:'云',p:'yún',w:['白云','云朵'],s:'天上有白云。',o:'横、横、撇折、点'},
   {c:'电',p:'diàn',w:['电视','用电'],s:'电视开着。',o:'竖、横折、横、横、竖弯钩'},
   {c:'天',p:'tiān',w:['天空','今天'],s:'今天天气好。',o:'横、横、撇、捺'},
  ],[ // L22
-  {c:'地',p:'dì',w:['地上','土地'],s:'地上有花。',o:'横、竖、提、竖、横折、竖弯钩'},
-  {c:'星',p:'xīng',w:['星星','繁星'],s:'星星亮了。',o:'竖、横折、横、横、横、竖、横、横'},
-  {c:'光',p:'guāng',w:['光明','阳光'],s:'阳光很亮。',o:'竖、点、撇、横、撇、竖弯钩、撇、捺'},
+  {c:'地',p:'dì',w:['地上','土地'],s:'地上有花。',o:'横、竖、提、横折钩、竖、竖弯钩'},
+  {c:'星',p:'xīng',w:['星星','繁星'],s:'星星亮了。',o:'竖、横折、横、横、撇、横、横、竖、横'},
+  {c:'光',p:'guāng',w:['光明','阳光'],s:'阳光很亮。',o:'竖、点、撇、横、撇、竖弯钩'},
  ],[ // L23
   {c:'子',p:'zǐ',w:['孩子','儿子'],s:'孩子在玩。',o:'横撇、竖钩、横'},
   {c:'女',p:'nǚ',w:['女儿','女孩'],s:'女孩在唱歌。',o:'撇点、撇、横'},
   {c:'父',p:'fù',w:['父母','父亲'],s:'父母爱我。',o:'撇、点、撇、捺'},
  ],[ // L24
-  {c:'母',p:'mǔ',w:['母亲','父母'],s:'母亲很爱我。',o:'竖、横折、横、点、横、点、横'},
-  {c:'男',p:'nán',w:['男孩','男女'],s:'男孩在跑。',o:'竖、横折、横、竖、横折、横、竖'},
-  {c:'老',p:'lǎo',w:['老师','老人'],s:'老师教我们。',o:'横、竖、横、撇、竖弯钩、撇、捺'},
+  {c:'母',p:'mǔ',w:['母亲','父母'],s:'母亲很爱我。',o:'竖折、横折钩、点、横、点'},
+  {c:'男',p:'nán',w:['男孩','男女'],s:'男孩在跑。',o:'竖、横折、横、竖、横、横折钩、撇'},
+  {c:'老',p:'lǎo',w:['老师','老人'],s:'老师教我们。',o:'横、竖、横、撇、撇、竖弯钩'},
  ],[ // L25
-  {c:'哥',p:'gē',w:['哥哥','大哥'],s:'哥哥上学了。',o:'横、竖、横折、横、竖、横折、横、竖钩'},
-  {c:'弟',p:'dì',w:['弟弟','兄弟'],s:'弟弟还小。',o:'点、撇、横折、横、竖、竖、横折、横、竖'},
+  {c:'哥',p:'gē',w:['哥哥','大哥'],s:'哥哥上学了。',o:'横、竖、横折、横、竖、横、竖、横折、横、竖钩'},
+  {c:'弟',p:'dì',w:['弟弟','兄弟'],s:'弟弟还小。',o:'点、撇、横折、横、竖折折钩、竖、撇'},
   {c:'长',p:'cháng',w:['长短','长江'],s:'长江很长。',o:'撇、横、竖提、捺'},
  ],[ // L26
-  {c:'短',p:'duǎn',w:['长短','短小'],s:'这笔很短。',o:'撇、横、横、横、竖、横折、横、竖、横折、横、竖、横'},
-  {c:'高',p:'gāo',w:['高低','高山'],s:'高山很高。',o:'点、横、竖、横折、横、竖、横折、竖、横折、横'},
-  {c:'低',p:'dī',w:['高低','低头'],s:'不要低头写字。',o:'撇、竖、撇、竖提、横、斜钩、撇、点'},
+  {c:'短',p:'duǎn',w:['长短','短小'],s:'这笔很短。',o:'撇、横、横、撇、点、横、竖、横折、横、点、撇、横'},
+  {c:'高',p:'gāo',w:['高低','高山'],s:'高山很高。',o:'点、横、竖、横折、横、竖、横折钩、竖、横折、横'},
+  {c:'低',p:'dī',w:['高低','低头'],s:'不要低头写字。',o:'撇、竖、撇、竖提、横、斜钩、点'},
  ],[ // L27
-  {c:'远',p:'yuǎn',w:['远近','很远'],s:'他家很远。',o:'横、竖、横、横、竖、竖、横折、横、竖弯钩'},
-  {c:'近',p:'jìn',w:['远近','很近'],s:'学校很近。',o:'撇、捺、横、竖、竖、横折、横、横、横'},
+  {c:'远',p:'yuǎn',w:['远近','很远'],s:'他家很远。',o:'横、横、撇、竖弯钩、点、横折折撇、捺'},
+  {c:'近',p:'jìn',w:['远近','很近'],s:'学校很近。',o:'撇、撇、横、竖、点、横折折撇、捺'},
   {c:'来',p:'lái',w:['来去','过来'],s:'妈妈过来了。',o:'横、点、撇、横、竖、撇、捺'},
  ],[ // L28
-  {c:'去',p:'qù',w:['来去','出去'],s:'我们出去玩。',o:'横、竖、横、撇、撇、横撇、捺'},
-  {c:'出',p:'chū',w:['出入','出来'],s:'太阳出来了。',o:'竖折、竖、横折、竖、竖'},
+  {c:'去',p:'qù',w:['来去','出去'],s:'我们出去玩。',o:'横、竖、横、撇折、点'},
+  {c:'出',p:'chū',w:['出入','出来'],s:'太阳出来了。',o:'竖折、竖、竖、竖折、竖'},
   {c:'入',p:'rù',w:['出入','进入'],s:'进入教室。',o:'撇、捺'},
  ],[ // L29
   {c:'开',p:'kāi',w:['开关','开门'],s:'请开门。',o:'横、横、撇、竖'},
-  {c:'关',p:'guān',w:['开关','关门'],s:'关上门。',o:'点、撇、横、横、撇、捺、横、竖、横、横'},
-  {c:'好',p:'hǎo',w:['好人','好玩'],s:'这个游戏好玩。',o:'撇点、撇、横、横、竖钩、横、撇、横、横'},
+  {c:'关',p:'guān',w:['开关','关门'],s:'关上门。',o:'点、撇、横、横、撇、捺'},
+  {c:'好',p:'hǎo',w:['好人','好玩'],s:'这个游戏好玩。',o:'撇点、撇、横、横撇、竖钩、横'},
  ],[ // L30
-  {c:'书',p:'shū',w:['读书','书本'],s:'我爱读书。',o:'横折、横、竖钩、点'},
-  {c:'本',p:'běn',w:['本子','书本'],s:'这是我的本子。',o:'横、竖、撇、捺、横、横'},
+  {c:'书',p:'shū',w:['读书','书本'],s:'我爱读书。',o:'横折、横折钩、竖、点'},
+  {c:'本',p:'běn',w:['本子','书本'],s:'这是我的本子。',o:'横、竖、撇、捺、横'},
  ],[ // L31
-  {c:'笔',p:'bǐ',w:['铅笔','毛笔'],s:'我用铅笔写字。',o:'撇、横、横、横、竖、横、竖折折钩、竖'},
-  {c:'画',p:'huà',w:['画画','图画'],s:'我爱画画。',o:'横、竖、横折、横、竖、横、竖、横折、横、横'},
+  {c:'笔',p:'bǐ',w:['铅笔','毛笔'],s:'我用铅笔写字。',o:'撇、横、点、撇、横、点、撇、横、横、竖弯钩'},
+  {c:'画',p:'huà',w:['画画','图画'],s:'我爱画画。',o:'横、竖、横折、横、竖、横、竖折、竖'},
  ],[ // L32
-  {c:'红',p:'hóng',w:['红色','红花'],s:'红花开了。',o:'撇折、撇折、提、横、竖、横、横'},
-  {c:'黄',p:'huáng',w:['黄色','金黄'],s:'金黄的稻子。',o:'横、竖、竖、横、横、竖、横折、横、竖、横、撇、点'},
+  {c:'红',p:'hóng',w:['红色','红花'],s:'红花开了。',o:'撇折、撇折、提、横、竖、横'},
+  {c:'黄',p:'huáng',w:['黄色','金黄'],s:'金黄的稻子。',o:'横、竖、竖、横、竖、横折、横、竖、横、撇、点'},
  ],[ // L33
-  {c:'蓝',p:'lán',w:['蓝色','蓝天'],s:'蓝天上有云。',o:'横、竖、竖、竖、横折、横、竖、横'},
-  {c:'绿',p:'lǜ',w:['绿色','绿草'],s:'绿草真美。',o:'撇折、撇折、提、横折、横、竖、撇、点、竖、横、撇、捺'},
+  {c:'蓝',p:'lán',w:['蓝色','蓝天'],s:'蓝天上有云。',o:'横、竖、竖、竖、竖、撇、横、点、竖、横折、竖、竖、横'},
+  {c:'绿',p:'lǜ',w:['绿色','绿草'],s:'绿草真美。',o:'撇折、撇折、提、横折、横、横、竖钩、点、提、撇、捺'},
  ],[ // L34
   {c:'白',p:'bái',w:['白色','白云'],s:'白云在天上。',o:'撇、竖、横折、横、横'},
-  {c:'黑',p:'hēi',w:['黑色','黑板'],s:'黑板是黑色。',o:'竖、横折、点、撇、横、横、横、点、点、点、点、横、竖、横、横、横'},
+  {c:'黑',p:'hēi',w:['黑色','黑板'],s:'黑板是黑色。',o:'竖、横折、点、撇、横、竖、横、横、点、点、点、点'},
  ],[ // L35
   {c:'春',p:'chūn',w:['春天','春风'],s:'春天来了。',o:'横、横、横、撇、捺、竖、横折、横、横'},
-  {c:'夏',p:'xià',w:['夏天','盛夏'],s:'夏天很热。',o:'横、竖、横折、横、横、竖、横、撇、捺、撇、竖弯钩'},
+  {c:'夏',p:'xià',w:['夏天','盛夏'],s:'夏天很热。',o:'横、撇、竖、横折、横、横、横、撇、横撇、捺'},
  ],[ // L36
-  {c:'秋',p:'qiū',w:['秋天','秋风'],s:'秋天到了。',o:'撇、横、竖、撇、点、点、撇、撇、捺、横、竖、横'},
-  {c:'冬',p:'dōng',w:['冬天','寒冬'],s:'冬天很冷。',o:'撇、横撇、捺、点、点、点、点、横、竖、横折、横、横'},
+  {c:'秋',p:'qiū',w:['秋天','秋风'],s:'秋天到了。',o:'撇、横、竖、撇、点、点、撇、撇、捺'},
+  {c:'冬',p:'dōng',w:['冬天','寒冬'],s:'冬天很冷。',o:'撇、横撇、捺、点、点'},
  ],[ // L37
-  {c:'加',p:'jiā',w:['加法','加上'],s:'一加一得二。',o:'横折、竖、撇、横、竖、横折、横、竖'},
-  {c:'减',p:'jiǎn',w:['减法','减去'],s:'三减一得二。',o:'点、提、横、竖、横折、横、竖、横、撇、捺、点、竖、横、横'},
+  {c:'加',p:'jiā',w:['加法','加上'],s:'一加一得二。',o:'横折钩、撇、竖、横折、横'},
+  {c:'减',p:'jiǎn',w:['减法','减去'],s:'三减一得二。',o:'点、提、横、撇、横、竖、横折、横、斜钩、撇、点'},
  ],[ // L38
-  {c:'个',p:'gè',w:['一个','几个'],s:'一个小朋友。',o:'撇、捺、竖、横'},
-  {c:'百',p:'bǎi',w:['一百','百分'],s:'一百分真棒。',o:'横、撇、竖、横折、横、横、横'},
+  {c:'个',p:'gè',w:['一个','几个'],s:'一个小朋友。',o:'撇、捺、竖'},
+  {c:'百',p:'bǎi',w:['一百','百分'],s:'一百分真棒。',o:'横、撇、竖、横折、横、横'},
  ],[ // L39
-  {c:'千',p:'qiān',w:['一千','千万'],s:'千万别迟到。',o:'撇、横、横、竖'},
-  {c:'万',p:'wàn',w:['千万','一万'],s:'一万分谢谢。',o:'横、横折钩、撇、竖弯钩'},
+  {c:'千',p:'qiān',w:['一千','千万'],s:'千万别迟到。',o:'撇、横、竖'},
+  {c:'万',p:'wàn',w:['千万','一万'],s:'一万分谢谢。',o:'横、横折钩、撇'},
  ],[ // L40
   {c:'你',p:'nǐ',w:['你好','你们'],s:'你好小朋友。',o:'撇、竖、撇、横撇、竖钩、撇、点'},
   {c:'我',p:'wǒ',w:['我们','自我'],s:'我们一起玩。',o:'撇、横、竖钩、提、斜钩、撇、点'},
@@ -352,33 +413,302 @@ LESSONS.forEach((arr, li) => arr.forEach((ch, ci) => {
 }));
 const ID2POS = {}; FLAT.forEach(o => ID2POS[o.gid] = o);
 
-/* SVG 笔顺（7 个高频字：一、二、三、人、口、日、月） */
-const STROKES = {
-    '一': [{d:'M20 100 L180 100'}],
-    '二': [{d:'M55 70 L145 70'},{d:'M20 135 L180 135'}],
-    '三': [{d:'M70 55 L130 55'},{d:'M30 100 L170 100'},{d:'M20 145 L180 145'}],
-    '人': [{d:'M100 25 Q70 100 35 175'},{d:'M100 70 Q130 120 170 175'}],
-    '口': [{d:'M55 45 L55 155'},{d:'M55 45 L145 45 L145 155'},{d:'M55 155 L145 155'}],
-    '日': [{d:'M50 35 L50 165'},{d:'M50 35 L150 35 L150 165'},{d:'M50 100 L150 100'},{d:'M50 165 L150 165'}],
-    '月': [{d:'M75 30 Q65 100 60 170'},{d:'M75 30 L150 30 L150 160 L145 168'},{d:'M75 95 L150 95'},{d:'M75 140 L150 140'}],
-};
+/* SVG 笔顺：STROKES 来自 chinese_strokes.js（真实汉字轮廓，viewBox 0-200） */
 const COLORS = ['#e91e63','#3f51b5','#009688','#ff9800','#795548','#9c27b0','#43a047','#00bcd4'];
+/* 取笔画起笔点（path 第一个 M 坐标） */
+function strokeStart(d){
+    const m = d.match(/M\s*([\d.]+)[\s,]+([\d.]+)/);
+    return m ? { x: +m[1], y: +m[2] } : null;
+}
 function strokeSVG(ch){
     const data = STROKES[ch];
     if(!data) return '';
-    let inner = '';
-    data.forEach((s, i) => {
+    // 数据 y 轴向上（数学坐标系），需垂直翻转：y -> 200 - y
+    let inner = `<g transform="matrix(1 0 0 -1 0 200)">`;
+    data.forEach((d, i) => {
         const col = COLORS[i % COLORS.length];
-        inner += `<path d="${s.d}" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
-        const m = s.d.match(/M([\d.]+)\s+([\d.]+)/);
-        if(m){
-            const x = +m[1], y = +m[2];
-            inner += `<circle cx="${x}" cy="${y}" r="13" fill="#fff" stroke="${col}" stroke-width="2"/>`;
-            inner += `<text x="${x}" y="${y+5}" text-anchor="middle" font-size="16" font-weight="bold" fill="${col}">${i+1}</text>`;
+        inner += `<path d="${d}" fill="${col}"/>`;
+        const p = strokeStart(d);
+        if(p){
+            inner += `<circle cx="${p.x}" cy="${p.y}" r="11" fill="#fff" stroke="${col}" stroke-width="2"/>`;
+        }
+    });
+    inner += `</g>`;
+    // 文字正向显示（在翻转 group 外，y 用 200 - p.y）
+    data.forEach((d, i) => {
+        const col = COLORS[i % COLORS.length];
+        const p = strokeStart(d);
+        if(p){
+            const yf = 200 - p.y;
+            inner += `<text x="${p.x}" y="${yf+4}" text-anchor="middle" font-size="13" font-weight="bold" fill="${col}">${i+1}</text>`;
         }
     });
     return `<div class="stroke-box"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${inner}</svg><div class="stroke-tip">不同颜色表示笔顺，数字为先后</div></div>`;
 }
+
+/* ================= 田字格跟写工具 ================= */
+const WriteTool = {
+    canvas:null, ctx:null, bg:null, bgCtx:null,
+    char:'', o:'', strokes:[], step:0,
+    paths:[], curPath:null, drawing:false, done:false,
+    S:220,
+    init(ch, o){
+        this.char = ch; this.o = o;
+        this.strokes = STROKES[ch] || [];
+        this.medians = (typeof STROKE_MEDIANS !== 'undefined' && STROKE_MEDIANS[ch]) || [];
+        this.step = 0; this.paths = []; this.curPath = null;
+        this.drawing = false; this.done = false;
+        this.canvas = $('writeCanvas'); this.ctx = this.canvas.getContext('2d');
+        this.bg = $('writeBg'); this.bgCtx = this.bg.getContext('2d');
+        this.drawBg();
+        this.ctx.clearRect(0,0,this.S,this.S);
+        this.bindEvents();
+        this.updateStep();
+    },
+    /* 点到线段距离 */
+    ptToSeg(p, a, b){
+        const dx = b[0]-a[0], dy = b[1]-a[1];
+        const len2 = dx*dx + dy*dy;
+        if(len2 === 0) return Math.hypot(p.x-a[0], p.y-a[1]);
+        let t = ((p.x-a[0])*dx + (p.y-a[1])*dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(p.x - (a[0]+t*dx), p.y - (a[1]+t*dy));
+    },
+    /* 路径长度（点数组，元素 {x,y} 或 [x,y]） */
+    pathLen(pts){
+        let s = 0;
+        for(let i = 1; i < pts.length; i++){
+            const a = pts[i-1], b = pts[i];
+            const ax = a.x !== undefined ? a.x : a[0], ay = a.y !== undefined ? a.y : a[1];
+            const bx = b.x !== undefined ? b.x : b[0], by = b.y !== undefined ? b.y : b[1];
+            s += Math.hypot(bx-ax, by-ay);
+        }
+        return s;
+    },
+    /* 判定孩子这一笔是否描在规定笔画上（宽松） */
+    judge(path){
+        if(path.length < 2) return {pass:false, reason:'太短，再写一次'};
+        if(!this.medians.length || this.step >= this.medians.length) return {pass:true, reason:''};
+        const med = this.medians[this.step];
+        if(!med || med.length < 1) return {pass:true, reason:''};
+        const sc = this.S / 200;
+        const medS = med.map(p => [p[0]*sc, p[1]*sc]);
+        // 1. 命中率：每个采样点到 median 线段的最近距离
+        const THRESH = this.S * 0.15;  // 宽松阈值（约田字格 15%）
+        let inCount = 0;
+        path.forEach(p => {
+            let minD = Infinity;
+            if(medS.length === 1){
+                minD = Math.hypot(p.x-medS[0][0], p.y-medS[0][1]);
+            } else {
+                for(let i = 0; i < medS.length - 1; i++){
+                    const d = this.ptToSeg(p, medS[i], medS[i+1]);
+                    if(d < minD) minD = d;
+                }
+            }
+            if(minD < THRESH) inCount++;
+        });
+        const hitRate = inCount / path.length;
+        // 2. 起笔接近度
+        const startD = Math.hypot(path[0].x - medS[0][0], path[0].y - medS[0][1]);
+        const startOK = startD < this.S * 0.22;
+        // 3. 长度比
+        const uLen = this.pathLen(path);
+        const mLen = this.pathLen(medS.map(p => ({x:p[0], y:p[1]})));
+        const ratio = uLen / Math.max(1, mLen);
+        const lenOK = ratio > 0.35 && ratio < 2.8;
+        // 宽松判定
+        const pass = hitRate >= 0.45 && startOK && lenOK;
+        let reason = '';
+        if(!pass){
+            if(!startOK) reason = '起笔位置偏了，看红色数字起点';
+            else if(hitRate < 0.45) reason = '没描在笔画上，沿着红色写';
+            else reason = '长度不太对，再写一次';
+        }
+        return {pass, hitRate, startD, ratio, reason};
+    },
+    /* 不通过反馈：变灰 + 提示 + 自动清除 */
+    flashFail(path, reason){
+        const ctx = this.ctx;
+        // 重画已写笔（红色）
+        ctx.clearRect(0,0,this.S,this.S);
+        ctx.strokeStyle = '#e91e63'; ctx.lineWidth = 8;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        this.paths.forEach(p => {
+            ctx.beginPath(); ctx.moveTo(p[0].x, p[0].y);
+            for(let i=1;i<p.length;i++) ctx.lineTo(p[i].x, p[i].y);
+            ctx.stroke();
+        });
+        // 当前笔灰色
+        ctx.strokeStyle = '#bbb'; ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
+        for(let i=1;i<path.length;i++) ctx.lineTo(path[i].x, path[i].y);
+        ctx.stroke();
+        // 提示
+        const el = $('writeStep');
+        el.innerHTML = `✗ ${reason}`;
+        // 1.2 秒后清掉灰色笔
+        clearTimeout(this._failTimer);
+        this._failTimer = setTimeout(() => {
+            this.ctx.clearRect(0,0,this.S,this.S);
+            const ctx2 = this.ctx;
+            ctx2.strokeStyle = '#e91e63'; ctx2.lineWidth = 8;
+            ctx2.lineCap = 'round'; ctx2.lineJoin = 'round';
+            this.paths.forEach(p => {
+                ctx2.beginPath(); ctx2.moveTo(p[0].x, p[0].y);
+                for(let i=1;i<p.length;i++) ctx2.lineTo(p[i].x, p[i].y);
+                ctx2.stroke();
+            });
+            this.updateStep();
+        }, 1200);
+    },
+    drawBg(){
+        const ctx = this.bgCtx, S = this.S;
+        ctx.clearRect(0,0,S,S);
+        ctx.fillStyle = '#fffef8'; ctx.fillRect(0,0,S,S);
+        // 田字格线
+        ctx.strokeStyle = '#ffcc80'; ctx.lineWidth = 2;
+        ctx.strokeRect(1,1,S-2,S-2);
+        ctx.setLineDash([4,4]); ctx.strokeStyle = '#ffe0b2'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(S/2,0); ctx.lineTo(S/2,S);
+        ctx.moveTo(0,S/2); ctx.lineTo(S,S/2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // 描红底：真实汉字轮廓（Path2D fill），y 轴翻转，当前笔高亮 + 起笔数字
+        if(this.strokes.length){
+            const sc = S/200;
+            // 笔画轮廓：y 向上坐标系，需翻转
+            ctx.save();
+            ctx.scale(sc, sc);
+            ctx.transform(1, 0, 0, -1, 0, 200);  // y -> 200 - y
+            this.strokes.forEach((d, i) => {
+                let col;
+                if(i < this.step) col = 'rgba(233,30,99,0.32)';        // 已写
+                else if(i === this.step) col = 'rgba(233,30,99,0.18)'; // 当前笔
+                else col = 'rgba(233,30,99,0.07)';                     // 未写
+                ctx.fillStyle = col;
+                try{ ctx.fill(new Path2D(d)); }catch(e){}
+            });
+            // 起笔圆点（翻转系内，用原始坐标自动翻转）
+            if(this.step < this.strokes.length){
+                const p = strokeStart(this.strokes[this.step]);
+                if(p){
+                    ctx.fillStyle = COLORS[this.step % COLORS.length];
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI*2); ctx.fill();
+                }
+            }
+            ctx.restore();
+            // 起笔数字（正向坐标系，y 翻转）
+            if(this.step < this.strokes.length){
+                const p = strokeStart(this.strokes[this.step]);
+                if(p){
+                    const cx = p.x * sc, cy = (200 - p.y) * sc;
+                    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(this.step+1, cx, cy+1);
+                }
+            }
+        } else {
+            ctx.fillStyle = 'rgba(233,30,99,0.12)';
+            ctx.font = 'bold ' + Math.round(this.S*0.68) + 'px "PingFang SC","Microsoft YaHei",serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(this.char, S/2, S/2+2);
+        }
+    },
+    total(){ return this.strokes.length || (this.o||'').split('、').filter(Boolean).length; },
+    updateStep(){
+        const el = $('writeStep'); if(!el) return;
+        if(this.strokes.length){
+            el.textContent = `第 ${Math.min(this.step+1, this.strokes.length)} / ${this.strokes.length} 笔 · 已写 ${this.paths.length} 笔`;
+        } else {
+            el.textContent = `已写 ${this.paths.length} 笔${this.total() ? ' / 共 '+this.total()+' 笔' : ''}`;
+        }
+        if(!this.done && this.total() && this.paths.length >= this.total()){
+            this.done = true;
+            el.innerHTML += ' ✅ 写完啦，真棒！';
+            setTimeout(()=>Voice.speak('写得太好啦，你真棒！','zh-CN',0.95), 150);
+        }
+    },
+    nextStep(){
+        if(this.step < this.strokes.length - 1){
+            this.step++; this.drawBg(); this.updateStep();
+        }
+    },
+    clearLast(){
+        if(!this.paths.length) return;
+        this.paths.pop();
+        this.ctx.clearRect(0,0,this.S,this.S);
+        const ctx = this.ctx;
+        ctx.strokeStyle = '#e91e63'; ctx.lineWidth = 8;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        this.paths.forEach(p => {
+            ctx.beginPath(); ctx.moveTo(p[0].x, p[0].y);
+            for(let i=1;i<p.length;i++) ctx.lineTo(p[i].x, p[i].y);
+            ctx.stroke();
+        });
+        this.done = false; this.updateStep();
+    },
+    reset(){
+        this.step = 0; this.paths = []; this.done = false;
+        this.drawBg(); this.ctx.clearRect(0,0,this.S,this.S);
+        this.updateStep();
+    },
+    bindEvents(){
+        const c = this.canvas;
+        const down = e => {
+            this.drawing = true; this.curPath = [];
+            const p = this.pos(e); this.curPath.push(p);
+            this.lastPt = p;
+            try{ c.setPointerCapture(e.pointerId); }catch(_){}
+            e.preventDefault();
+        };
+        const move = e => {
+            if(!this.drawing) return;
+            const p = this.pos(e);
+            this.curPath.push(p);
+            this.ctx.strokeStyle = '#e91e63'; this.ctx.lineWidth = 8;
+            this.ctx.lineCap = 'round'; this.ctx.lineJoin = 'round';
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.lastPt.x, this.lastPt.y);
+            this.ctx.lineTo(p.x, p.y);
+            this.ctx.stroke();
+            this.lastPt = p;
+            e.preventDefault();
+        };
+        const up = e => {
+            if(!this.drawing) return;
+            this.drawing = false;
+            try{ c.releasePointerCapture(e.pointerId); }catch(_){}
+            if(this.curPath && this.curPath.length > 1){
+                const path = this.curPath;
+                const r = this.judge(path);
+                if(r.pass){
+                    this.paths.push(path);
+                    this.step = Math.min(this.step + 1, this.strokes.length);
+                    this.drawBg();
+                    this.updateStep();
+                    // 单笔通过反馈
+                    const el = $('writeStep');
+                    if(this.step < this.strokes.length){
+                        el.innerHTML = `✓ 第 ${this.step} 笔写得不错！继续下一笔`;
+                    }
+                } else {
+                    this.flashFail(path, r.reason);
+                }
+            }
+            this.curPath = null;
+        };
+        c.addEventListener('pointerdown', down);
+        c.addEventListener('pointermove', move);
+        c.addEventListener('pointerup', up);
+        c.addEventListener('pointercancel', up);
+    },
+    pos(e){
+        const r = this.canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * (this.S / r.width), y: (e.clientY - r.top) * (this.S / r.height) };
+    }
+};
 
 /* ================= 状态 ================= */
 let pos = Store.get('learn_chinese_pos', { l: 0, c: 0 });
@@ -420,6 +750,20 @@ function render(){
         <div class="pinyin">${ch.p}</div>
         ${strokeSVG(ch.c)}
         <div class="order"><b>笔顺：</b>${ch.o}</div>
+        <div class="section-title">✍️ 田字格跟写</div>
+        <div class="write-area">
+            <div class="write-wrap">
+                <canvas class="write-bg" id="writeBg" width="220" height="220"></canvas>
+                <canvas class="write-canvas" id="writeCanvas" width="220" height="220"></canvas>
+            </div>
+            <div class="write-step" id="writeStep">准备写字</div>
+            <div class="write-ops">
+                <button class="wbtn" id="wClear">🗑 清一笔</button>
+                <button class="wbtn ${STROKES[ch.c] ? '' : 'hidden'}" id="wNext">下一笔 →</button>
+                <button class="wbtn" id="wReset">↻ 重新写</button>
+            </div>
+            <div class="stroke-tip">👆 用手指在田字格里描着写${STROKES[ch.c] ? '，按数字顺序一笔一笔来' : '，照着淡红色字描'}</div>
+        </div>
         <div class="section-title">📖 组词（点 🔊 朗读）</div>
         <div class="word-row">
             <button class="word-btn" data-w="${ch.w[0]}">${ch.w[0]} 🔊</button>
@@ -440,6 +784,12 @@ function render(){
     const sb = document.querySelector('.sent-btn'); if(sb) sb.addEventListener('click', () => Voice.speak(ch.s));
     $('listenBtn').addEventListener('click', () => Voice.speak(ch.c));
     $('readBtn').addEventListener('click', startRead);
+
+    // 田字格跟写初始化
+    WriteTool.init(ch.c, ch.o);
+    $('wClear').addEventListener('click', () => WriteTool.clearLast());
+    $('wNext').addEventListener('click', () => WriteTool.nextStep());
+    $('wReset').addEventListener('click', () => WriteTool.reset());
 
     // 收藏按钮状态
     const favBtn = $('favBtn');

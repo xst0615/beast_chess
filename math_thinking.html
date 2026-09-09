@@ -151,6 +151,7 @@
         .emoji-box.shape { font-size: 60px; }
     }
 </style>
+<script src="audio/manifest.js"></script>
 </head>
 <body>
 <a href="learning_hub.html" class="back-link">← 学习中心</a>
@@ -197,12 +198,51 @@ const Store = {
 
 // ================= 语音工具 =================
 const Voice = {
-    speak(text, lang = 'zh-CN', rate = 0.9) {
+    speak(text, lang = 'zh-CN', rate = 0.9, opts = {}) {
+        window.speechSynthesis && window.speechSynthesis.cancel();
+        if(window.AudioManifest && window.AudioManifest[text]){
+            try{
+                const a = new Audio('audio/' + window.AudioManifest[text]);
+                if(opts && opts.onEnd) a.addEventListener('ended', () => opts.onEnd());
+                a.addEventListener('error', () => this._tts(text, lang, rate, opts));
+                a.play().catch(() => this._tts(text, lang, rate, opts));
+                return true;
+            }catch(e){}
+        }
+        return this._tts(text, lang, rate, opts);
+    },
+    _tts(text, lang = 'zh-CN', rate = 0.9, opts = {}) {
         if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器以获得语音功能'); return false; }
         window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = lang; u.rate = rate;
-        window.speechSynthesis.speak(u);
+        const voices = window.speechSynthesis.getVoices() || [];
+        const hints = lang.startsWith('zh') ? ['婷婷','Google 普通话','Tingting','Yaoyao','Meijia','zh-CN','zh_CN'] : ['Samantha','Google US English','Karen','Moira','Tessa','Fiona','en-US','en_US'];
+        const v = voices.find(x => hints.some(h => (x.name||'').includes(h) || x.lang === h));
+        const queue = [];
+        if(opts.intro) queue.push({ t: opts.intro, p: 1.32, r: 1.0, gap: 220 });
+        const parts = text.match(/[^。！？，；,.!?;]+[。！？，；,.!?;]?/g) || [text];
+        parts.forEach(seg => {
+            const s = seg.trim(); if(!s) return;
+            const last = s.slice(-1);
+            let p = 1.16, gap = 130;
+            if(/[？?]/.test(last)){ p = 1.42; gap = 250; }
+            else if(/[！!]/.test(last)){ p = 1.30; gap = 230; }
+            else if(/[。.]/.test(last)){ p = 1.06; gap = 280; }
+            else { p = 1.20; gap = 110; }
+            queue.push({ t: s, p, r: rate * 0.92, gap });
+        });
+        if(opts.praise) queue.push({ t: opts.praise, p: 1.38, r: 0.95, gap: 0 });
+        const play = (i) => {
+            if(i >= queue.length){ opts.onEnd && opts.onEnd(); return; }
+            const it = queue[i];
+            const u = new SpeechSynthesisUtterance(it.t);
+            u.lang = lang; u.rate = it.r; u.pitch = it.p;
+            if(v) u.voice = v;
+            u.onend = () => setTimeout(() => play(i+1), it.gap);
+            u.onerror = () => play(i+1);
+            opts.onSeg && opts.onSeg(it.t, i);
+            window.speechSynthesis.speak(u);
+        };
+        play(0);
         return true;
     },
     listen(lang = 'zh-CN', onResult, onEnd) {
@@ -217,6 +257,11 @@ const Voice = {
         return true;
     }
 };
+// 预加载语音列表（Chrome 异步加载，触发后用户首次点击即有女声）
+if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 // 顺序朗读多段文字（避免互相打断）
 function speakChain(parts, rate = 0.9) {
     if (!('speechSynthesis' in window)) { alert('请用 Chrome 浏览器以获得语音功能'); return; }
@@ -262,7 +307,7 @@ const LESSONS = [
     // ===== 数感 10 课 =====
     { id:'ns1', type:'数感', stem:'数一数，下面有几个苹果？', emoji:'🍎🍎🍎🍎🍎', options:['3','4','5','6'], answer:2 },
     { id:'ns2', type:'数感', stem:'数一数，下面有几颗星星？', emoji:'⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐', options:['13','14','15','16'], answer:2 },
-    { id:'ns3', type:'数感', stem:'数一数，图中有几只小鸭子？', emoji:'🦆🦆🦆🦆🦆🦆🦆', options:['6','7','8','9'], answer:2 },
+    { id:'ns3', type:'数感', stem:'数一数，图中有几只小鸭子？', emoji:'🦆🦆🦆🦆🦆🦆🦆', options:['6','7','8','9'], answer:1 },
     { id:'ns4', type:'数感', stem:'5 的前面一个数是几？', emoji:'4  5  6', options:['3','4','6','7'], answer:1 },
     { id:'ns5', type:'数感', stem:'比大小：5 和 8，中间填什么？', emoji:'5  ⬜  8', options:['大于 >','小于 <','等于 =','加号 +'], answer:1 },
     { id:'ns6', type:'数感', stem:'从左数，第 3 个苹果是什么颜色？', emoji:'🍎 🍏 🍎 🍏 🍎 🍏', options:['红色','绿色','黄色','蓝色'], answer:0 },

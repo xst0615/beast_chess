@@ -4,3 +4,11 @@ node_modules/
 media_hub/data/sessions/
 # 调试截图与临时产物
 media_hub/data/debug/
+# 临时生成脚本与调试文件
+gen_audio.py
+gen_avatar_gif.py
+launch_meishi_debug.command
+launch_meishi_debug.sh
+meishi_analysis/
+history/
+.trae/
