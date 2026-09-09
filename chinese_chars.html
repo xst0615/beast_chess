@@ -183,6 +183,21 @@ function toggleFav(id){
     return f.includes(id);
 }
 
+/* ================= 浏览器兼容提示（软 toast，替代 alert） ================= */
+function showToast(msg, type = 'info') {
+    let t = document.getElementById('__toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = '__toast';
+        t.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.82);color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;z-index:9999;max-width:80vw;text-align:center;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,0.3);';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.transition = 'opacity 0.3s'; t.style.opacity = '0'; }, 2500);
+}
+
 /* ================= 语音工具 ================= */
 const Voice = {
     speak(text, lang = 'zh-CN', rate = 0.9, opts = {}){
@@ -200,7 +215,7 @@ const Voice = {
         return this._tts(text, lang, rate, opts);
     },
     _tts(text, lang = 'zh-CN', rate = 0.9, opts = {}){
-        if(!('speechSynthesis' in window)){ alert('您的浏览器不支持语音朗读，请用 Chrome'); return false; }
+        if(!('speechSynthesis' in window)){ showToast('浏览器不支持朗读，可点看字跟读'); return false; }
         window.speechSynthesis.cancel();
         // 选女声，更柔和生动（婷婷为 macOS 中文女声，优先匹配）
         const voices = window.speechSynthesis.getVoices() || [];
@@ -243,7 +258,7 @@ const Voice = {
     },
     listen(lang = 'zh-CN', onResult, onEnd){
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(!SR){ alert('您的浏览器不支持语音识别，请用 Chrome 浏览器'); onResult(null); return false; }
+        if(!SR){ showToast('当前浏览器不支持语音识别，可点击喇叭跟读'); onResult(null); return false; }
         const r = new SR();
         r.lang = lang; r.continuous = false; r.interimResults = false; r.maxAlternatives = 3;
         r.onresult = e => onResult(e.results[0][0].transcript);
