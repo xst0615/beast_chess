@@ -198,6 +198,30 @@ function showToast(msg, type = 'info') {
     t._timer = setTimeout(() => { t.style.transition = 'opacity 0.3s'; t.style.opacity = '0'; }, 2500);
 }
 
+/* ================= 录音回放（让孩子听自己声音） ================= */
+function showPlayback(url) {
+    let box = document.getElementById('__playback');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = '__playback';
+        box.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#fff;border:2px solid #e91e63;border-radius:14px;padding:10px 14px;z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;gap:10px;max-width:90vw;';
+        document.body.appendChild(box);
+    }
+    box.innerHTML = '';
+    const lbl = document.createElement('span');
+    lbl.textContent = '🎵 听自己读';
+    lbl.style.cssText = 'font-size:13px;color:#e91e63;font-weight:bold;white-space:nowrap;';
+    const audio = document.createElement('audio');
+    audio.src = url; audio.controls = true;
+    audio.style.cssText = 'height:32px;max-width:200px;';
+    const close = document.createElement('button');
+    close.textContent = '✕';
+    close.style.cssText = 'background:#eee;border:none;width:26px;height:26px;border-radius:13px;cursor:pointer;font-size:14px;';
+    close.onclick = () => { box.style.display = 'none'; };
+    box.appendChild(lbl); box.appendChild(audio); box.appendChild(close);
+    box.style.display = 'flex';
+}
+
 /* ================= 语音工具 ================= */
 const Voice = {
     speak(text, lang = 'zh-CN', rate = 0.9, opts = {}){
@@ -258,14 +282,58 @@ const Voice = {
     },
     listen(lang = 'zh-CN', onResult, onEnd){
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(!SR){ showToast('当前浏览器不支持语音识别，可点击喇叭跟读'); onResult(null); return false; }
+        if(!SR){
+            // 不支持语音识别时，仍可录音让孩子自己听
+            this._recordOnly(onEnd);
+            showToast('当前浏览器不支持语音识别，录音可自己听');
+            onResult(null);
+            return false;
+        }
         const r = new SR();
         r.lang = lang; r.continuous = false; r.interimResults = false; r.maxAlternatives = 3;
         r.onresult = e => onResult(e.results[0][0].transcript);
         r.onerror = () => onResult(null);
-        r.onend = () => onEnd && onEnd();
+        r.onend = () => {
+            // SR 结束时停止录音，显示回放按钮
+            Voice.stopRec();
+            if(Voice._lastRec) showPlayback(Voice._lastRec);
+            onEnd && onEnd();
+        };
+        // 同时录音，让孩子能回放听自己声音
+        this._recordOnly(null, true);
         r.start();
         return true;
+    },
+    /* 录音工具：录下麦克风音频，结束后返回 blob URL */
+    _recordOnly(onEnd, silent){
+        if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){
+            onEnd && onEnd(null);
+            return;
+        }
+        let mr = null, chunks = [];
+        navigator.mediaDevices.getUserMedia({audio: true}).then(stream => {
+            mr = new MediaRecorder(stream);
+            mr.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+            mr.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
+                const url = URL.createObjectURL(blob);
+                Voice._lastRec = url;
+                if(onEnd) onEnd(url);
+                if(!silent) showPlayback(url);
+            };
+            mr.start();
+            Voice._mr = mr;
+        }).catch(() => { onEnd && onEnd(null); });
+        // 6 秒自动停（防过长）
+        clearTimeout(Voice._mrTimer);
+        Voice._mrTimer = setTimeout(() => Voice.stopRec(), 6000);
+    },
+    stopRec(){
+        if(Voice._mr && Voice._mr.state !== 'inactive'){
+            Voice._mr.stop();
+        }
+        Voice._mr = null;
     },
     score(target, heard){
         if(!heard) return 0;
